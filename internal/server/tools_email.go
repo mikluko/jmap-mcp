@@ -17,20 +17,21 @@ import (
 // --- email_query ---
 
 type EmailQueryInput struct {
-	MailboxID     string `json:"mailbox_id,omitempty" jsonschema:"ID of the mailbox to search in"`
-	Query         string `json:"query,omitempty" jsonschema:"Full-text search query"`
-	From          string `json:"from,omitempty" jsonschema:"Filter by sender address"`
-	To            string `json:"to,omitempty" jsonschema:"Filter by recipient address"`
-	Subject       string `json:"subject,omitempty" jsonschema:"Filter by subject text"`
-	Before        string `json:"before,omitempty" jsonschema:"Emails before this date (RFC 3339 or YYYY-MM-DD)"`
-	After         string `json:"after,omitempty" jsonschema:"Emails after this date (RFC 3339 or YYYY-MM-DD)"`
-	HasAttachment *bool  `json:"has_attachment,omitempty" jsonschema:"Filter by attachment presence"`
-	Limit         int    `json:"limit,omitempty" jsonschema:"Maximum number of results (default 20)"`
+	MailboxID     string   `json:"mailbox_id,omitempty" jsonschema:"ID of the mailbox to search in"`
+	Query         string   `json:"query,omitempty" jsonschema:"Full-text search query"`
+	From          string   `json:"from,omitempty" jsonschema:"Filter by sender address"`
+	To            string   `json:"to,omitempty" jsonschema:"Filter by recipient address"`
+	Subject       string   `json:"subject,omitempty" jsonschema:"Filter by subject text"`
+	Before        string   `json:"before,omitempty" jsonschema:"Emails before this date (RFC 3339 or YYYY-MM-DD)"`
+	After         string   `json:"after,omitempty" jsonschema:"Emails after this date (RFC 3339 or YYYY-MM-DD)"`
+	HasAttachment *bool    `json:"has_attachment,omitempty" jsonschema:"Filter by attachment presence"`
+	Limit         int      `json:"limit,omitempty" jsonschema:"Maximum number of results (default 20)"`
+	Headers       []string `json:"headers,omitempty" jsonschema:"Header names to include in results (e.g. List-Id, Message-ID)"`
 }
 
 var emailQueryTool = &mcp.Tool{
 	Name:        "email_query",
-	Description: "Search emails with filters. Returns ID, subject, sender, date, and size (bytes) for each match. Use email_get to retrieve full content. Sorted by date descending.",
+	Description: "Search emails with filters. Returns ID, subject, sender, date, and size (bytes) for each match. Optionally include specific headers (e.g. List-Id, Message-ID) via the headers parameter. Use email_get to retrieve full content. Sorted by date descending.",
 	Annotations: readOnlyAnnotations,
 }
 
@@ -85,6 +86,10 @@ func (s *Server) handleEmailQuery(ctx context.Context, _ *mcp.CallToolRequest, i
 	})
 
 	// Chain Email/get via back-reference to fetch summary fields in one round-trip.
+	properties := []string{"id", "subject", "from", "receivedAt", "size"}
+	if len(in.Headers) > 0 {
+		properties = append(properties, "headers")
+	}
 	req.Invoke(&email.Get{
 		Account: accountID,
 		ReferenceIDs: &jmap.ResultReference{
@@ -92,7 +97,7 @@ func (s *Server) handleEmailQuery(ctx context.Context, _ *mcp.CallToolRequest, i
 			Name:     "Email/query",
 			Path:     "/ids",
 		},
-		Properties: []string{"id", "subject", "from", "receivedAt", "size"},
+		Properties: properties,
 	})
 
 	resp, err := client.Do(req)
@@ -134,6 +139,14 @@ func (s *Server) handleEmailQuery(ctx context.Context, _ *mcp.CallToolRequest, i
 				date = e.ReceivedAt.Format("2006-01-02 15:04")
 			}
 			fmt.Fprintf(&sb, "%s  %s  %s  [%d bytes]  %s\n", e.ID, date, from, e.Size, e.Subject)
+			for _, h := range e.Headers {
+				for _, want := range in.Headers {
+					if strings.EqualFold(h.Name, want) {
+						fmt.Fprintf(&sb, "  %s: %s\n", h.Name, strings.TrimSpace(h.Value))
+						break
+					}
+				}
+			}
 		}
 		return textResult(sb.String()), nil, nil
 	case *jmap.MethodError:
