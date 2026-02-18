@@ -69,9 +69,10 @@ In HTTP mode, the token can come from the `jmap_token` query parameter.
 ```bash
 helm install jmap-mcp oci://ghcr.io/mikluko/helm-charts/jmap-mcp \
   --version 0.1.0 \
-  --set jmap.sessionURL="https://api.fastmail.com/jmap/session" \
-  --set jmap.authToken="your-token"
+  --set jmap.sessionURL="https://api.fastmail.com/jmap/session"
 ```
+
+In HTTP mode, JMAP auth tokens are passed per-request via `?jmap_token=` query parameter — no static tokens are stored in the cluster.
 
 ### Binary
 

@@ -59,35 +59,3 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{/*
-Create the name of the secret to use
-*/}}
-{{- define "jmap-mcp.secretName" -}}
-{{- if .Values.jmap.existingSecret.name }}
-{{- .Values.jmap.existingSecret.name }}
-{{- else }}
-{{- include "jmap-mcp.fullname" . }}
-{{- end }}
-{{- end }}
-
-{{/*
-Key for session URL in the secret
-*/}}
-{{- define "jmap-mcp.secretSessionURLKey" -}}
-{{- if .Values.jmap.existingSecret.name }}
-{{- .Values.jmap.existingSecret.sessionURLKey | default "session-url" }}
-{{- else -}}
-session-url
-{{- end -}}
-{{- end }}
-
-{{/*
-Key for auth token in the secret
-*/}}
-{{- define "jmap-mcp.secretAuthTokenKey" -}}
-{{- if .Values.jmap.existingSecret.name }}
-{{- .Values.jmap.existingSecret.authTokenKey | default "auth-token" }}
-{{- else -}}
-auth-token
-{{- end -}}
-{{- end }}

@@ -33,11 +33,9 @@
    {{- end }}
    Sieve:    sieve_get, sieve_set, sieve_validate
 
-4. Security Notes:
+4. Authentication:
+   - JMAP auth tokens are passed per-request via ?jmap_token= query parameter
+   - No static tokens are stored in the cluster
    {{- if not .Values.ingress.enabled }}
-   - Ingress is disabled. Consider enabling ingress with authentication for external access
-   {{- end }}
-   {{- if .Values.jmap.authToken }}
-   - WARNING: Auth token is stored directly in values.yaml
-   - Consider using existingSecret for production deployments
+   - Ingress is disabled. Consider enabling ingress with TLS for external access
    {{- end }}

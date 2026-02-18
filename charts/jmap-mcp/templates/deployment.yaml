@@ -14,7 +14,6 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- if .Values.proxy.enabled }}
         checksum/config-proxy: {{ include (print $.Template.BasePath "/config-proxy.yaml") . | sha256sum }}
         {{- if .Values.proxy.auth.enabled }}
@@ -51,15 +50,7 @@ spec:
           {{- end }}
         env:
         - name: JMAP_SESSION_URL
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "jmap-mcp.secretName" . }}
-              key: {{ include "jmap-mcp.secretSessionURLKey" . }}
-        - name: JMAP_AUTH_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "jmap-mcp.secretName" . }}
-              key: {{ include "jmap-mcp.secretAuthTokenKey" . }}
+          value: {{ required "jmap.sessionURL is required" .Values.jmap.sessionURL | quote }}
         ports:
         - name: http
           containerPort: {{ .Values.server.port }}

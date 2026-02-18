@@ -13,23 +13,11 @@ fullnameOverride: ""
 # JMAP configuration
 jmap:
   # JMAP session endpoint URL - REQUIRED
+  # e.g. https://api.fastmail.com/jmap/session
   sessionURL: ""
 
-  # JMAP bearer token - REQUIRED when creating managed secret
-  # Leave empty when using existingSecret
-  authToken: ""
-
-  # Enable the email_send tool (disabled by default for safety)
+  # Enable the email_submission_set tool (disabled by default for safety)
   enableSend: false
-
-  # External secret reference
-  existingSecret:
-    # Name of existing secret (leave empty to create managed secret)
-    name: ""
-    # Key for session URL within the secret
-    sessionURLKey: "session-url"
-    # Key for auth token within the secret
-    authTokenKey: "auth-token"
 
 server:
   port: 8080
