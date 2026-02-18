@@ -30,7 +30,7 @@ type EmailQueryInput struct {
 
 var emailQueryTool = &mcp.Tool{
 	Name:        "email_query",
-	Description: "Search emails with filters, returns matching email IDs and total count. Returns only IDs — use email_get to retrieve full content. Sorted by date descending.",
+	Description: "Search emails with filters. Returns ID, subject, sender, date, and size (bytes) for each match. Use email_get to retrieve full content. Sorted by date descending.",
 	Annotations: readOnlyAnnotations,
 }
 
@@ -76,12 +76,23 @@ func (s *Server) handleEmailQuery(ctx context.Context, _ *mcp.CallToolRequest, i
 	}
 
 	req := &jmap.Request{Context: ctx}
-	req.Invoke(&email.Query{
+	queryCallID := req.Invoke(&email.Query{
 		Account:        accountID,
 		Filter:         filter,
 		Sort:           []*email.SortComparator{{Property: "receivedAt", IsAscending: false}},
 		Limit:          limit,
 		CalculateTotal: true,
+	})
+
+	// Chain Email/get via back-reference to fetch summary fields in one round-trip.
+	req.Invoke(&email.Get{
+		Account: accountID,
+		ReferenceIDs: &jmap.ResultReference{
+			ResultOf: queryCallID,
+			Name:     "Email/query",
+			Path:     "/ids",
+		},
+		Properties: []string{"id", "subject", "from", "receivedAt", "size"},
 	})
 
 	resp, err := client.Do(req)
@@ -93,12 +104,36 @@ func (s *Server) handleEmailQuery(ctx context.Context, _ *mcp.CallToolRequest, i
 		return errorResult(fmt.Errorf("empty response for Email/query")), nil, nil
 	}
 
+	// First response: Email/query
+	var total uint64
 	switch args := resp.Responses[0].Args.(type) {
 	case *email.QueryResponse:
+		total = args.Total
+	case *jmap.MethodError:
+		return errorResult(args), nil, nil
+	default:
+		return errorResult(fmt.Errorf("unexpected response type: %T", args)), nil, nil
+	}
+
+	// Second response: Email/get with summary properties
+	if len(resp.Responses) < 2 {
+		return errorResult(fmt.Errorf("missing Email/get response in query chain")), nil, nil
+	}
+
+	switch args := resp.Responses[1].Args.(type) {
+	case *email.GetResponse:
 		var sb strings.Builder
-		fmt.Fprintf(&sb, "Total: %d (returning %d)\n", args.Total, len(args.IDs))
-		for _, id := range args.IDs {
-			fmt.Fprintf(&sb, "%s\n", id)
+		fmt.Fprintf(&sb, "Total: %d (returning %d)\n\n", total, len(args.List))
+		for _, e := range args.List {
+			from := ""
+			if len(e.From) > 0 {
+				from = formatAddresses(e.From)
+			}
+			date := ""
+			if e.ReceivedAt != nil {
+				date = e.ReceivedAt.Format("2006-01-02 15:04")
+			}
+			fmt.Fprintf(&sb, "%s  %s  %s  [%d bytes]  %s\n", e.ID, date, from, e.Size, e.Subject)
 		}
 		return textResult(sb.String()), nil, nil
 	case *jmap.MethodError:
@@ -113,11 +148,14 @@ func (s *Server) handleEmailQuery(ctx context.Context, _ *mcp.CallToolRequest, i
 type EmailGetInput struct {
 	EmailIDs    []string `json:"email_ids" jsonschema:"IDs of emails to retrieve"`
 	FullHeaders bool     `json:"full_headers,omitempty" jsonschema:"Include all raw email headers"`
+	MaxChars    int      `json:"max_chars,omitempty" jsonschema:"Maximum total response size in characters (default 50000). When exceeded, remaining emails are omitted with an advisory to fetch fewer at a time."`
 }
+
+const defaultMaxChars = 50000
 
 var emailGetTool = &mcp.Tool{
 	Name:        "email_get",
-	Description: "Get full content of emails by ID, including headers, body text, flags, and mailbox membership. Use email_query first to obtain IDs.",
+	Description: "Get full content of emails by ID, including headers, body text, flags, and mailbox membership. Use email_query first to obtain IDs. Response is capped at max_chars (default 50000); excess emails are omitted with an advisory — reduce batch size if truncated.",
 	Annotations: readOnlyAnnotations,
 }
 
@@ -171,39 +209,57 @@ func (s *Server) handleEmailGet(ctx context.Context, _ *mcp.CallToolRequest, in 
 			return errorResult(fmt.Errorf("no emails found")), nil, nil
 		}
 
+		maxChars := in.MaxChars
+		if maxChars <= 0 {
+			maxChars = defaultMaxChars
+		}
+
 		var sb strings.Builder
+		included := 0
 		for i, e := range args.List {
+			// Render headers into a temporary buffer.
+			var hdr strings.Builder
 			if i > 0 {
-				fmt.Fprintf(&sb, "\n---\n\n")
+				fmt.Fprintf(&hdr, "\n---\n\n")
 			}
 			if in.FullHeaders && len(e.Headers) > 0 {
 				for _, h := range e.Headers {
-					fmt.Fprintf(&sb, "%s: %s\n", h.Name, strings.TrimSpace(h.Value))
+					fmt.Fprintf(&hdr, "%s: %s\n", h.Name, strings.TrimSpace(h.Value))
 				}
 			} else {
-				fmt.Fprintf(&sb, "ID: %s\n", e.ID)
-				fmt.Fprintf(&sb, "Subject: %s\n", e.Subject)
+				fmt.Fprintf(&hdr, "ID: %s\n", e.ID)
+				fmt.Fprintf(&hdr, "Subject: %s\n", e.Subject)
 				if len(e.From) > 0 {
-					fmt.Fprintf(&sb, "From: %s\n", formatAddresses(e.From))
+					fmt.Fprintf(&hdr, "From: %s\n", formatAddresses(e.From))
 				}
 				if len(e.To) > 0 {
-					fmt.Fprintf(&sb, "To: %s\n", formatAddresses(e.To))
+					fmt.Fprintf(&hdr, "To: %s\n", formatAddresses(e.To))
 				}
 				if len(e.CC) > 0 {
-					fmt.Fprintf(&sb, "CC: %s\n", formatAddresses(e.CC))
+					fmt.Fprintf(&hdr, "CC: %s\n", formatAddresses(e.CC))
 				}
 				if e.ReceivedAt != nil {
-					fmt.Fprintf(&sb, "Date: %s\n", e.ReceivedAt.Format(time.RFC3339))
+					fmt.Fprintf(&hdr, "Date: %s\n", e.ReceivedAt.Format(time.RFC3339))
 				}
 			}
-			fmt.Fprintln(&sb)
+			fmt.Fprintln(&hdr)
 
 			body := extractBody(e)
-			if body != "" {
-				sb.WriteString(body)
-			} else {
-				sb.WriteString("(no body content)")
+			if body == "" {
+				body = "(no body content)"
 			}
+
+			// Check if appending this email would exceed the limit.
+			remaining := maxChars - sb.Len() - hdr.Len()
+			if remaining <= 0 {
+				omitted := len(args.List) - included
+				fmt.Fprintf(&sb, "\n\n--- TRUNCATED: %d of %d emails omitted (response would exceed %d chars). Fetch fewer emails per call. ---\n", omitted, len(args.List), maxChars)
+				break
+			}
+
+			sb.WriteString(hdr.String())
+			sb.WriteString(TruncateBody(body, remaining))
+			included++
 		}
 
 		return textResult(sb.String()), nil, nil
@@ -561,12 +617,12 @@ func formatAddresses(addrs []*mail.Address) string {
 func extractBody(e *email.Email) string {
 	for _, part := range e.TextBody {
 		if bv, ok := e.BodyValues[part.PartID]; ok {
-			return bv.Value
+			return PrepareBody(bv.Value, 0)
 		}
 	}
 	for _, part := range e.HTMLBody {
 		if bv, ok := e.BodyValues[part.PartID]; ok {
-			return html2text.HTML2Text(bv.Value)
+			return PrepareBody(html2text.HTML2Text(StripBlockquotes(bv.Value)), 0)
 		}
 	}
 	return ""
