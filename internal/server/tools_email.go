@@ -168,7 +168,7 @@ const defaultMaxChars = 50000
 
 var emailGetTool = &mcp.Tool{
 	Name:        "email_get",
-	Description: "Get full content of emails by ID, including headers, body text, flags, and mailbox membership. Use email_query first to obtain IDs. Response is capped at max_chars (default 50000); excess emails are omitted with an advisory — reduce batch size if truncated.",
+	Description: "Get full content of emails by ID, including body text, flags, and mailbox membership. Set full_headers to include all raw headers. Use email_query first to obtain IDs. Response is capped at max_chars (default 50000); excess emails are omitted with an advisory — reduce batch size if truncated.",
 	Annotations: readOnlyAnnotations,
 }
 
@@ -440,7 +440,7 @@ type EmailFlagInput struct {
 
 var emailFlagTool = &mcp.Tool{
 	Name:        "email_flag",
-	Description: "Set or remove flags on emails. Supports: seen (read/unread), flagged (starred), answered, draft. Each flag is independent — omit to leave unchanged.",
+	Description: "Set or remove flags on emails. Supports: seen (read/unread), flagged (starred), answered, draft. Each flag is independent — omit to leave unchanged. Use email_query to obtain IDs.",
 	Annotations: idempotentAnnotations,
 }
 
@@ -515,7 +515,7 @@ type EmailDeleteInput struct {
 
 var emailDeleteTool = &mcp.Tool{
 	Name:        "email_delete",
-	Description: "Delete emails by moving to Trash (default), or permanently destroy them (permanent=true). Permanent destruction cannot be undone.",
+	Description: "Delete emails by moving to Trash (default), or permanently destroy them (permanent=true). Permanent destruction cannot be undone. Use email_query to obtain IDs.",
 	Annotations: destructiveAnnotations,
 }
 
