@@ -60,7 +60,7 @@ server-json: ## Generate server.json from template
 
 # MCP Registry
 publish: server-json ## Publish server to MCP Registry (requires mcp-publisher)
-	mcp-publisher publish .build/server.json
+	mcp-publisher login github -token $$(gh auth token) && mcp-publisher publish .build/server.json
 
 # Local development
 run-stdio: ## Run in stdio mode locally
