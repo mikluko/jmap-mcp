@@ -1,12 +1,13 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build build-image build-chart test test-coverage lint clean install run-stdio run-http
+.PHONY: help build image package publish test test-coverage lint clean install run-stdio run-http
 
 # Variables
 GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.0.0-$(shell git rev-parse --short HEAD)")
 VERSION := $(GIT_VERSION:v%=%)
 KO_DOCKER_REPO := ghcr.io/mikluko/jmap-mcp
 CHART_REPO := ghcr.io/mikluko/helm-charts
+MCP_SERVER_NAME := io.github.mikluko/jmap-mcp
 export KO_DOCKER_REPO
 
 help: ## Show this help message
@@ -20,7 +21,12 @@ build: image package ## Build and push container image and Helm chart
 
 image: ## Build and push container image with ko
 	@echo "Building and pushing image: $(KO_DOCKER_REPO):$(VERSION)"
-	VERSION=$(VERSION) ko build --bare --tags $(VERSION)
+	VERSION=$(VERSION) ko build --bare --tags $(VERSION) \
+		--image-label io.modelcontextprotocol.server.name=$(MCP_SERVER_NAME) \
+		--image-label org.opencontainers.image.source=https://github.com/mikluko/jmap-mcp \
+		--image-label org.opencontainers.image.description="MCP server for email management via JMAP" \
+		--image-annotation io.modelcontextprotocol.server.name=$(MCP_SERVER_NAME) \
+		--image-annotation org.opencontainers.image.source=https://github.com/mikluko/jmap-mcp
 
 package: ## Package and push Helm chart to OCI registry
 	@echo "Packaging and pushing chart: $(CHART_REPO)/jmap-mcp:$(VERSION)"
@@ -47,6 +53,10 @@ clean: ## Clean build artifacts
 
 install: ## Install the binary
 	go install -ldflags="-X main.version=$(VERSION)"
+
+# MCP Registry
+publish: ## Publish server to MCP Registry (requires mcp-publisher)
+	mcp-publisher publish
 
 # Local development
 run-stdio: ## Run in stdio mode locally

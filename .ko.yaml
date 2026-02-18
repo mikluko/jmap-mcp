@@ -10,7 +10,3 @@ builds:
     ldflags:
       - -s -w
       - -X main.version={{.Env.VERSION}}
-    labels:
-      io.modelcontextprotocol.server.name: io.github.mikluko/jmap-mcp
-      org.opencontainers.image.source: https://github.com/mikluko/jmap-mcp
-      org.opencontainers.image.description: MCP server for email management via JMAP protocol
