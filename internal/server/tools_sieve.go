@@ -30,7 +30,8 @@ type SieveGetInput struct {
 
 var sieveGetTool = &mcp.Tool{
 	Name:        "sieve_get",
-	Description: "Get Sieve scripts: list all (no ID) or get full content of one (with ID) (maps to JMAP SieveScript/get)",
+	Description: "Get Sieve scripts (server-side email filtering rules). Without ID: list all scripts with metadata. With ID: return full script content. Use this to discover script IDs before updating.",
+	Annotations: readOnlyAnnotations,
 }
 
 func (s *Server) handleSieveGet(ctx context.Context, _ *mcp.CallToolRequest, in SieveGetInput) (*mcp.CallToolResult, any, error) {
@@ -133,7 +134,8 @@ type SieveSetInput struct {
 
 var sieveSetTool = &mcp.Tool{
 	Name:        "sieve_set",
-	Description: "Create, update, or destroy Sieve scripts (maps to JMAP SieveScript/set)",
+	Description: "Create, update, or destroy Sieve scripts. Supports activation on create/update. Use sieve_validate first to check script syntax before saving.",
+	Annotations: destructiveAnnotations,
 }
 
 func (s *Server) handleSieveSet(ctx context.Context, _ *mcp.CallToolRequest, in SieveSetInput) (*mcp.CallToolResult, any, error) {
@@ -262,7 +264,8 @@ type SieveValidateInput struct {
 
 var sieveValidateTool = &mcp.Tool{
 	Name:        "sieve_validate",
-	Description: "Validate a Sieve script without saving it (maps to JMAP SieveScript/validate)",
+	Description: "Validate a Sieve script without saving it. Use this to check syntax before calling sieve_set. Returns validation errors if the script is invalid.",
+	Annotations: readOnlyAnnotations,
 }
 
 func (s *Server) handleSieveValidate(ctx context.Context, _ *mcp.CallToolRequest, in SieveValidateInput) (*mcp.CallToolResult, any, error) {

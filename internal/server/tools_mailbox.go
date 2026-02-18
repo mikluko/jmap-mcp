@@ -19,7 +19,8 @@ type MailboxGetInput struct {
 
 var mailboxGetTool = &mcp.Tool{
 	Name:        "mailbox_get",
-	Description: "Get mailboxes by ID, or list all mailboxes with names, roles, and email counts",
+	Description: "Get mailboxes by ID, or list all mailboxes with names, roles, and email counts. Use this first to discover mailbox IDs for other tools.",
+	Annotations: readOnlyAnnotations,
 }
 
 func (s *Server) handleMailboxGet(ctx context.Context, _ *mcp.CallToolRequest, in MailboxGetInput) (*mcp.CallToolResult, any, error) {
@@ -93,7 +94,8 @@ type MailboxSetInput struct {
 
 var mailboxSetTool = &mcp.Tool{
 	Name:        "mailbox_set",
-	Description: "Create, update, or destroy mailboxes (maps to JMAP Mailbox/set)",
+	Description: "Create, update, or destroy mailboxes. Supports batch operations: create new folders, rename or reparent existing ones, or destroy by ID.",
+	Annotations: destructiveAnnotations,
 }
 
 func (s *Server) handleMailboxSet(ctx context.Context, _ *mcp.CallToolRequest, in MailboxSetInput) (*mcp.CallToolResult, any, error) {

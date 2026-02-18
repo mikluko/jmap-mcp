@@ -9,6 +9,53 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+const serverInstructions = `JMAP MCP Server — email and Sieve script management via JMAP protocol.
+
+## Key concepts
+
+- **Mailbox**: a folder (Inbox, Drafts, Sent, Trash, etc.). Each has an ID and a role.
+- **Email**: belongs to one or more mailboxes, identified by an opaque ID.
+- **Identity**: a sender address the user may send from.
+- **Sieve script**: server-side email filtering rules (auto-filing, vacation replies, etc.).
+
+## Common workflows
+
+**Reading email**: call mailbox_get to discover mailbox IDs and roles, then email_query with filters to get matching email IDs, then email_get with those IDs to retrieve full content.
+
+**Sending email**: call email_create to compose a draft (saved in Drafts), then email_submission_set with the draft ID to submit for delivery (automatically moves from Drafts to Sent).
+
+**Managing email**: use email_move to move between mailboxes, email_flag to mark as read/flagged/answered, email_delete to trash or permanently destroy.
+
+**Managing mailboxes**: use mailbox_set to create, rename, reparent, or destroy mailboxes.
+
+**Sieve scripts**: use sieve_get to list or read scripts, sieve_set to create/update/destroy, sieve_validate to check syntax without saving.
+
+## Important notes
+
+- All tool inputs use opaque string IDs. Get IDs from other tools first (mailbox_get, email_query, identity_get, sieve_get).
+- email_query returns only IDs and total count; always follow up with email_get for content.
+- email_submission_set may not be available — it requires the server to be started with -enable-send flag.
+`
+
+// annotation helpers
+func boolPtr(v bool) *bool { return &v }
+
+var (
+	readOnlyAnnotations = &mcp.ToolAnnotations{
+		ReadOnlyHint: true,
+	}
+	idempotentAnnotations = &mcp.ToolAnnotations{
+		DestructiveHint: boolPtr(false),
+		IdempotentHint:  true,
+	}
+	destructiveAnnotations = &mcp.ToolAnnotations{
+		DestructiveHint: boolPtr(true),
+	}
+	mutatingAnnotations = &mcp.ToolAnnotations{
+		DestructiveHint: boolPtr(false),
+	}
+)
+
 // registerTools registers all JMAP tools with the MCP server.
 func (s *Server) registerTools() {
 	// Mailbox tools (Mailbox/get, Mailbox/set)

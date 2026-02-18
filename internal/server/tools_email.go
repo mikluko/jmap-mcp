@@ -29,7 +29,8 @@ type EmailQueryInput struct {
 
 var emailQueryTool = &mcp.Tool{
 	Name:        "email_query",
-	Description: "Search emails with filters, returns matching email IDs and total count (maps to JMAP Email/query)",
+	Description: "Search emails with filters, returns matching email IDs and total count. Returns only IDs — use email_get to retrieve full content. Sorted by date descending.",
+	Annotations: readOnlyAnnotations,
 }
 
 func (s *Server) handleEmailQuery(ctx context.Context, _ *mcp.CallToolRequest, in EmailQueryInput) (*mcp.CallToolResult, any, error) {
@@ -115,7 +116,8 @@ type EmailGetInput struct {
 
 var emailGetTool = &mcp.Tool{
 	Name:        "email_get",
-	Description: "Get full content of emails by ID, including body text (maps to JMAP Email/get)",
+	Description: "Get full content of emails by ID, including headers, body text, flags, and mailbox membership. Use email_query first to obtain IDs.",
+	Annotations: readOnlyAnnotations,
 }
 
 func (s *Server) handleEmailGet(ctx context.Context, _ *mcp.CallToolRequest, in EmailGetInput) (*mcp.CallToolResult, any, error) {
@@ -223,7 +225,8 @@ type EmailCreateInput struct {
 
 var emailCreateTool = &mcp.Tool{
 	Name:        "email_create",
-	Description: "Create a new email draft in the Drafts mailbox",
+	Description: "Create a new email draft in the Drafts mailbox. Returns the draft ID, which can be passed to email_submission_set to send it.",
+	Annotations: mutatingAnnotations,
 }
 
 func (s *Server) handleEmailCreate(ctx context.Context, _ *mcp.CallToolRequest, in EmailCreateInput) (*mcp.CallToolResult, any, error) {
@@ -297,7 +300,8 @@ type EmailMoveInput struct {
 
 var emailMoveTool = &mcp.Tool{
 	Name:        "email_move",
-	Description: "Move emails to a different mailbox",
+	Description: "Move emails to a different mailbox by ID. Replaces all current mailbox memberships. Use mailbox_get to find the destination mailbox ID.",
+	Annotations: idempotentAnnotations,
 }
 
 func (s *Server) handleEmailMove(ctx context.Context, _ *mcp.CallToolRequest, in EmailMoveInput) (*mcp.CallToolResult, any, error) {
@@ -366,7 +370,8 @@ type EmailFlagInput struct {
 
 var emailFlagTool = &mcp.Tool{
 	Name:        "email_flag",
-	Description: "Set or remove flags (seen, flagged, answered, draft) on emails",
+	Description: "Set or remove flags on emails. Supports: seen (read/unread), flagged (starred), answered, draft. Each flag is independent — omit to leave unchanged.",
+	Annotations: idempotentAnnotations,
 }
 
 func (s *Server) handleEmailFlag(ctx context.Context, _ *mcp.CallToolRequest, in EmailFlagInput) (*mcp.CallToolResult, any, error) {
@@ -440,7 +445,8 @@ type EmailDeleteInput struct {
 
 var emailDeleteTool = &mcp.Tool{
 	Name:        "email_delete",
-	Description: "Delete emails by moving to Trash, or permanently destroy them",
+	Description: "Delete emails by moving to Trash (default), or permanently destroy them (permanent=true). Permanent destruction cannot be undone.",
+	Annotations: destructiveAnnotations,
 }
 
 func (s *Server) handleEmailDelete(ctx context.Context, _ *mcp.CallToolRequest, in EmailDeleteInput) (*mcp.CallToolResult, any, error) {

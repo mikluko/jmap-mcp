@@ -21,7 +21,8 @@ type EmailSubmissionSetInput struct {
 
 var emailSubmissionSetTool = &mcp.Tool{
 	Name:        "email_submission_set",
-	Description: "Submit an email for delivery and move it from Drafts to Sent (requires -enable-send flag) (maps to JMAP EmailSubmission/set)",
+	Description: "Submit a draft email for delivery. Automatically moves it from Drafts to Sent and removes the draft flag. Create the draft first with email_create. Identity is auto-detected if omitted.",
+	Annotations: mutatingAnnotations,
 }
 
 func (s *Server) handleEmailSubmissionSet(ctx context.Context, _ *mcp.CallToolRequest, in EmailSubmissionSetInput) (*mcp.CallToolResult, any, error) {

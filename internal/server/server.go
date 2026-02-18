@@ -28,7 +28,9 @@ func NewServer(version, sessionURL, token string, enableSend bool) *Server {
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    "jmap-mcp",
 		Version: version,
-	}, nil)
+	}, &mcp.ServerOptions{
+		Instructions: serverInstructions,
+	})
 
 	s := &Server{
 		mcp:        mcpServer,

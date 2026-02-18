@@ -19,7 +19,8 @@ type IdentityGetInput struct {
 
 var identityGetTool = &mcp.Tool{
 	Name:        "identity_get",
-	Description: "Get sender identities (email addresses the user may send from) (maps to JMAP Identity/get)",
+	Description: "Get sender identities — the email addresses the user may send from. Useful before email_submission_set to choose or verify the sender identity.",
+	Annotations: readOnlyAnnotations,
 }
 
 func (s *Server) handleIdentityGet(ctx context.Context, _ *mcp.CallToolRequest, in IdentityGetInput) (*mcp.CallToolResult, any, error) {
