@@ -17,7 +17,7 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # Build targets
-build: image package ## Build and push container image and Helm chart
+build: image package server-json ## Build and push container image, Helm chart, and server.json
 
 image: ## Build and push container image with ko
 	@echo "Building and pushing image: $(KO_DOCKER_REPO):$(VERSION)"
@@ -54,9 +54,13 @@ clean: ## Clean build artifacts
 install: ## Install the binary
 	go install -ldflags="-X main.version=$(VERSION)"
 
+server-json: ## Generate server.json from template
+	@mkdir -p .build
+	VERSION=$(VERSION) envsubst < server.json.tmpl > .build/server.json
+
 # MCP Registry
-publish: ## Publish server to MCP Registry (requires mcp-publisher)
-	mcp-publisher publish
+publish: server-json ## Publish server to MCP Registry (requires mcp-publisher)
+	mcp-publisher publish .build/server.json
 
 # Local development
 run-stdio: ## Run in stdio mode locally

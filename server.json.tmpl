@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.mikluko/jmap-mcp",
+  "title": "JMAP Email",
+  "description": "Email management via JMAP — mailboxes, messages, identities, and Sieve scripts",
+  "repository": {
+    "url": "https://github.com/mikluko/jmap-mcp",
+    "source": "github"
+  },
+  "version": "${VERSION}",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/mikluko/jmap-mcp:${VERSION}",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "JMAP_SESSION_URL",
+          "description": "JMAP session endpoint URL (e.g. https://api.fastmail.com/jmap/session)",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "JMAP_AUTH_TOKEN",
+          "description": "JMAP bearer token for authentication",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
