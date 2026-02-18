@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/k3a/html2text"
 	"github.com/mikluko/jmap"
 	"github.com/mikluko/jmap/mail"
 	"github.com/mikluko/jmap/mail/email"
@@ -565,7 +566,7 @@ func extractBody(e *email.Email) string {
 	}
 	for _, part := range e.HTMLBody {
 		if bv, ok := e.BodyValues[part.PartID]; ok {
-			return bv.Value
+			return html2text.HTML2Text(bv.Value)
 		}
 	}
 	return ""
