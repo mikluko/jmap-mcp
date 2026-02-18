@@ -26,12 +26,13 @@ type EmailQueryInput struct {
 	After         string   `json:"after,omitempty" jsonschema:"Emails after this date (RFC 3339 or YYYY-MM-DD)"`
 	HasAttachment *bool    `json:"has_attachment,omitempty" jsonschema:"Filter by attachment presence"`
 	Limit         int      `json:"limit,omitempty" jsonschema:"Maximum number of results (default 20)"`
+	Fields        []string `json:"fields,omitempty" jsonschema:"Fields to include per result. Available: subject, from, receivedAt, size (all included by default). ID is always included."`
 	Headers       []string `json:"headers,omitempty" jsonschema:"Header names to include in results (e.g. List-Id, Message-ID)"`
 }
 
 var emailQueryTool = &mcp.Tool{
 	Name:        "email_query",
-	Description: "Search emails with filters. Returns ID, subject, sender, date, and size (bytes) for each match. Optionally include specific headers (e.g. List-Id, Message-ID) via the headers parameter. Use email_get to retrieve full content. Sorted by date descending.",
+	Description: "Search emails with filters. Returns ID plus selected fields per match (default: subject, from, receivedAt, size). Use the fields parameter to request only specific fields. Optionally include specific headers (e.g. List-Id, Message-ID) via the headers parameter. Use email_get to retrieve full content. Sorted by date descending.",
 	Annotations: readOnlyAnnotations,
 }
 
@@ -86,7 +87,16 @@ func (s *Server) handleEmailQuery(ctx context.Context, _ *mcp.CallToolRequest, i
 	})
 
 	// Chain Email/get via back-reference to fetch summary fields in one round-trip.
-	properties := []string{"id", "subject", "from", "receivedAt", "size"}
+	fields := in.Fields
+	if len(fields) == 0 {
+		fields = []string{"subject", "from", "receivedAt", "size"}
+	}
+	fieldSet := make(map[string]bool, len(fields))
+	properties := []string{"id"}
+	for _, f := range fields {
+		fieldSet[f] = true
+		properties = append(properties, f)
+	}
 	if len(in.Headers) > 0 {
 		properties = append(properties, "headers")
 	}
@@ -130,15 +140,20 @@ func (s *Server) handleEmailQuery(ctx context.Context, _ *mcp.CallToolRequest, i
 		var sb strings.Builder
 		fmt.Fprintf(&sb, "Total: %d (returning %d)\n\n", total, len(args.List))
 		for _, e := range args.List {
-			from := ""
-			if len(e.From) > 0 {
-				from = formatAddresses(e.From)
+			parts := []string{string(e.ID)}
+			if fieldSet["receivedAt"] && e.ReceivedAt != nil {
+				parts = append(parts, e.ReceivedAt.Format("2006-01-02 15:04"))
 			}
-			date := ""
-			if e.ReceivedAt != nil {
-				date = e.ReceivedAt.Format("2006-01-02 15:04")
+			if fieldSet["from"] && len(e.From) > 0 {
+				parts = append(parts, formatAddresses(e.From))
 			}
-			fmt.Fprintf(&sb, "%s  %s  %s  [%d bytes]  %s\n", e.ID, date, from, e.Size, e.Subject)
+			if fieldSet["size"] {
+				parts = append(parts, fmt.Sprintf("[%d bytes]", e.Size))
+			}
+			if fieldSet["subject"] {
+				parts = append(parts, e.Subject)
+			}
+			fmt.Fprintf(&sb, "%s\n", strings.Join(parts, "  "))
 			for _, h := range e.Headers {
 				for _, want := range in.Headers {
 					if strings.EqualFold(h.Name, want) {
