@@ -56,7 +56,7 @@ install: ## Install the binary
 
 server-json: ## Generate server.json from template
 	@mkdir -p .build
-	VERSION=$(VERSION) envsubst < server.json.tmpl > .build/server.json
+	VERSION=$(VERSION) envsubst '$$VERSION' < server.json.tmpl > .build/server.json
 
 # MCP Registry
 publish: server-json ## Publish server to MCP Registry (requires mcp-publisher)
