@@ -15,16 +15,35 @@ import (
 	_ "github.com/mikluko/jmap/sieve/sievescript"
 )
 
+// Option configures optional Server behavior.
+type Option func(*Server)
+
+// WithToken sets a static JMAP auth token (used in stdio mode).
+func WithToken(token string) Option {
+	return func(s *Server) { s.token = token }
+}
+
+// WithEmailSubmission enables the email_submission_set tool.
+func WithEmailSubmission() Option {
+	return func(s *Server) { s.enableEmailSubmission = true }
+}
+
+// WithSieve enables the sieve_get, sieve_set, and sieve_validate tools.
+func WithSieve() Option {
+	return func(s *Server) { s.enableSieve = true }
+}
+
 // Server wraps the MCP server and JMAP client.
 type Server struct {
-	mcp        *mcp.Server
-	sessionURL string
-	token      string // static token for stdio mode; empty in HTTP-only mode
-	enableSend bool   // gate email_send tool
+	mcp                   *mcp.Server
+	sessionURL            string
+	token                 string // static token for stdio mode; empty in HTTP-only mode
+	enableEmailSubmission bool
+	enableSieve           bool
 }
 
 // NewServer creates a new MCP server with JMAP tools.
-func NewServer(version, sessionURL, token string, enableSend bool) *Server {
+func NewServer(version, sessionURL string, opts ...Option) *Server {
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    "jmap-mcp",
 		Version: version,
@@ -35,8 +54,9 @@ func NewServer(version, sessionURL, token string, enableSend bool) *Server {
 	s := &Server{
 		mcp:        mcpServer,
 		sessionURL: sessionURL,
-		token:      token,
-		enableSend: enableSend,
+	}
+	for _, opt := range opts {
+		opt(s)
 	}
 
 	s.registerTools()

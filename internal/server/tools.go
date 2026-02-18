@@ -35,6 +35,7 @@ const serverInstructions = `JMAP MCP Server — email and Sieve script managemen
 - All tool inputs use opaque string IDs. Get IDs from other tools first (mailbox_get, email_query, identity_get, sieve_get).
 - email_query returns only IDs and total count; always follow up with email_get for content.
 - email_submission_set may not be available — it requires the server to be started with -enable-send flag.
+- sieve_get, sieve_set, sieve_validate may not be available — they require the -enable-sieve flag and a JMAP server that advertises urn:ietf:params:jmap:sieve.
 `
 
 // annotation helpers
@@ -74,14 +75,16 @@ func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, identityGetTool, s.handleIdentityGet)
 
 	// Feature-gated: email_submission_set requires -enable-send flag
-	if s.enableSend {
+	if s.enableEmailSubmission {
 		mcp.AddTool(s.mcp, emailSubmissionSetTool, s.handleEmailSubmissionSet)
 	}
 
-	// Sieve tools (SieveScript/get, SieveScript/set, SieveScript/validate)
-	mcp.AddTool(s.mcp, sieveGetTool, s.handleSieveGet)
-	mcp.AddTool(s.mcp, sieveSetTool, s.handleSieveSet)
-	mcp.AddTool(s.mcp, sieveValidateTool, s.handleSieveValidate)
+	// Feature-gated: Sieve tools require -enable-sieve flag
+	if s.enableSieve {
+		mcp.AddTool(s.mcp, sieveGetTool, s.handleSieveGet)
+		mcp.AddTool(s.mcp, sieveSetTool, s.handleSieveSet)
+		mcp.AddTool(s.mcp, sieveValidateTool, s.handleSieveValidate)
+	}
 }
 
 // --- shared helpers ---

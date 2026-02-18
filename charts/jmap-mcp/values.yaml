@@ -19,6 +19,9 @@ jmap:
   # Enable the email_submission_set tool (disabled by default for safety)
   enableSend: false
 
+  # Enable Sieve script tools (disabled by default, requires server support)
+  enableSieve: false
+
 server:
   port: 8080
 

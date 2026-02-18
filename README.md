@@ -39,13 +39,13 @@ Tools map closely to JMAP methods. Email mutation tools provide structured conve
 |------------------------|------------------------|----------------------------------------------------|
 | `email_submission_set` | `EmailSubmission/set`  | Submit a draft for delivery (requires `-enable-send`) |
 
-### Sieve Scripts (RFC 9425)
+### Sieve Scripts (RFC 9661, feature-gated)
 
-| Tool             | JMAP Method            | Description                                          |
-|------------------|------------------------|------------------------------------------------------|
-| `sieve_get`      | `SieveScript/get`      | List all scripts, or get one with full content       |
-| `sieve_set`      | `SieveScript/set`      | Create, update, or destroy Sieve scripts             |
-| `sieve_validate` | `SieveScript/validate` | Validate a Sieve script without saving               |
+| Tool             | JMAP Method            | Description                                                         |
+|------------------|------------------------|---------------------------------------------------------------------|
+| `sieve_get`      | `SieveScript/get`      | List all scripts, or get one with full content (requires `-enable-sieve`) |
+| `sieve_set`      | `SieveScript/set`      | Create, update, or destroy Sieve scripts (requires `-enable-sieve`)      |
+| `sieve_validate` | `SieveScript/validate` | Validate a Sieve script without saving (requires `-enable-sieve`)        |
 
 ## Configuration
 
@@ -58,7 +58,8 @@ Tools map closely to JMAP methods. Email mutation tools provide structured conve
 |------------------|---------|------------------------------------------------|
 | `-mode`          | `stdio` | Server mode: `stdio` or `http`                 |
 | `-listen`        | `:8080` | HTTP listen address (http mode only)           |
-| `-enable-send`   | `false` | Enable the `email_submission_set` tool (off by default) |
+| `-enable-send`   | `false` | Enable the `email_submission_set` tool (off by default)                     |
+| `-enable-sieve`  | `false` | Enable Sieve script tools (off by default, requires JMAP server support)    |
 
 In HTTP mode, the token can come from the `jmap_token` query parameter.
 

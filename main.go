@@ -22,7 +22,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := server.NewServer(version, cfg.SessionURL, cfg.AuthToken, cfg.EnableSend)
+	var opts []server.Option
+	if cfg.AuthToken != "" {
+		opts = append(opts, server.WithToken(cfg.AuthToken))
+	}
+	if cfg.EnableEmailSubmission {
+		opts = append(opts, server.WithEmailSubmission())
+	}
+	if cfg.EnableSieve {
+		opts = append(opts, server.WithSieve())
+	}
+	srv := server.NewServer(version, cfg.SessionURL, opts...)
 
 	switch cfg.Mode {
 	case "stdio":

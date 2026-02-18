@@ -8,11 +8,12 @@ import (
 
 // Config holds the application configuration.
 type Config struct {
-	Mode       string // "stdio" or "http"
-	ListenAddr string // for HTTP mode
-	SessionURL string // JMAP session URL
-	AuthToken  string // JMAP bearer token (optional in http mode)
-	EnableSend bool   // enable email_send tool
+	Mode                  string // "stdio" or "http"
+	ListenAddr            string // for HTTP mode
+	SessionURL            string // JMAP session URL
+	AuthToken             string // JMAP bearer token (optional in http mode)
+	EnableEmailSubmission bool   // enable email_submission_set tool
+	EnableSieve           bool   // enable sieve tools
 }
 
 // LoadConfig parses command-line flags and environment variables.
@@ -21,7 +22,8 @@ func LoadConfig() (*Config, error) {
 
 	flag.StringVar(&cfg.Mode, "mode", "stdio", "Server mode: stdio or http")
 	flag.StringVar(&cfg.ListenAddr, "listen", ":8080", "HTTP listen address (http mode only)")
-	flag.BoolVar(&cfg.EnableSend, "enable-send", false, "Enable email_send tool (disabled by default for safety)")
+	flag.BoolVar(&cfg.EnableEmailSubmission, "enable-send", false, "Enable email_submission_set tool (disabled by default for safety)")
+	flag.BoolVar(&cfg.EnableSieve, "enable-sieve", false, "Enable Sieve script tools (disabled by default, requires server support)")
 	flag.Parse()
 
 	cfg.SessionURL = os.Getenv("JMAP_SESSION_URL")

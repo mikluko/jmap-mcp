@@ -34,7 +34,7 @@ In HTTP mode, the token can come from the `jmap_token` query parameter instead o
 ```
 main.go                         # entrypoint: flag parsing, transport selection (stdio/http)
 internal/
-  config/                       # CLI flags + env vars (JMAP_SESSION_URL, JMAP_AUTH_TOKEN, -enable-send)
+  config/                       # CLI flags + env vars (JMAP_SESSION_URL, JMAP_AUTH_TOKEN, -enable-send, -enable-sieve)
   server/                       # MCP server wrapper
     server.go                   # Server struct, token resolution, jmap.Client factory, blank imports for type registration
     context.go                  # Token context key, TokenQueryMiddleware for HTTP mode
@@ -113,6 +113,8 @@ Tools map closely to JMAP methods. Email mutation tools (`email_move`, `email_fl
 | `sieve_validate` | blob upload + `SieveScript/validate` | tools_sieve.go |
 
 `email_submission_set` is feature-gated behind the `-enable-send` CLI flag (default `false`). Without this flag, the tool is not registered and not visible to MCP clients.
+
+`sieve_get`, `sieve_set`, `sieve_validate` are feature-gated behind the `-enable-sieve` CLI flag (default `false`). Not all JMAP servers support Sieve (e.g. Fastmail does not advertise `urn:ietf:params:jmap:sieve`).
 
 ### Tool naming
 

@@ -48,6 +48,9 @@ spec:
           {{- if .Values.jmap.enableSend }}
           - -enable-send
           {{- end }}
+          {{- if .Values.jmap.enableSieve }}
+          - -enable-sieve
+          {{- end }}
         env:
         - name: JMAP_SESSION_URL
           value: {{ required "jmap.sessionURL is required" .Values.jmap.sessionURL | quote }}
