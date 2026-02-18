@@ -1,0 +1,49 @@
+{{- if .Values.proxy.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "jmap-mcp.fullname" . }}-proxy
+  labels:
+    {{- include "jmap-mcp.labels" . | nindent 4 }}
+data:
+  traefik.yaml: |
+    entryPoints:
+      web:
+        address: ":{{ .Values.proxy.port }}"
+
+    log:
+      level: INFO
+
+    accessLog:
+      format: json
+
+    ping:
+      entryPoint: web
+
+    providers:
+      file:
+        filename: /etc/traefik/traefik.yaml
+
+    http:
+      routers:
+        mcp:
+          rule: "PathPrefix(`/`)"
+          service: mcp-backend
+          {{- if .Values.proxy.auth.enabled }}
+          middlewares:
+            - basic-auth
+          {{- end }}
+
+      {{- if .Values.proxy.auth.enabled }}
+      middlewares:
+        basic-auth:
+          basicAuth:
+            usersFile: "/etc/traefik/users"
+      {{- end }}
+
+      services:
+        mcp-backend:
+          loadBalancer:
+            servers:
+              - url: "http://127.0.0.1:{{ .Values.server.port }}"
+{{- end }}

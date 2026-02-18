@@ -1,0 +1,16 @@
+apiVersion: v2
+name: jmap-mcp
+description: A Helm chart for JMAP MCP Server
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - mcp
+  - jmap
+  - email
+  - sieve
+home: https://github.com/mikluko/jmap-mcp
+sources:
+  - https://github.com/mikluko/jmap-mcp
+maintainers:
+  - name: mikluko

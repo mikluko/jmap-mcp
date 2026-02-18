@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "jmap-mcp.fullname" . }}
+  labels:
+    {{- include "jmap-mcp.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ if .Values.proxy.enabled }}proxy{{ else }}http{{ end }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "jmap-mcp.selectorLabels" . | nindent 4 }}

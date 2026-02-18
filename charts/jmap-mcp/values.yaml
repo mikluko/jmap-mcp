@@ -1,0 +1,131 @@
+# Default values for jmap-mcp
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mikluko/jmap-mcp
+  pullPolicy: IfNotPresent
+  tag: "" # Overrides the image tag (default is the chart appVersion)
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# JMAP configuration
+jmap:
+  # JMAP session endpoint URL - REQUIRED
+  sessionURL: ""
+
+  # JMAP bearer token - REQUIRED when creating managed secret
+  # Leave empty when using existingSecret
+  authToken: ""
+
+  # Enable the email_send tool (disabled by default for safety)
+  enableSend: false
+
+  # External secret reference
+  existingSecret:
+    # Name of existing secret (leave empty to create managed secret)
+    name: ""
+    # Key for session URL within the secret
+    sessionURLKey: "session-url"
+    # Key for auth token within the secret
+    authTokenKey: "auth-token"
+
+server:
+  port: 8080
+
+# Traefik proxy sidecar (always deployed for access logging)
+proxy:
+  enabled: true
+  # Traefik image
+  image:
+    repository: traefik
+    tag: "v3.2"
+    pullPolicy: IfNotPresent
+  # Traefik listens on this port
+  port: 8081
+  # Resource limits for Traefik sidecar
+  resources:
+    limits:
+      cpu: 100m
+      memory: 64Mi
+    requests:
+      cpu: 50m
+      memory: 32Mi
+
+  # Optional basic authentication
+  auth:
+    # Enable basic auth protection
+    enabled: false
+    # Basic auth username (ignored if htpasswd is set)
+    username: "admin"
+    # Basic auth password (will be bcrypt hashed, ignored if htpasswd is set)
+    password: ""
+    # Complete htpasswd entry (takes precedence over username/password)
+    # Generate with: htpasswd -nbB admin your-password
+    htpasswd: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: jmap-mcp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Gateway API HTTPRoute
+httpRoute:
+  enabled: false
+  annotations: {}
+  parentRefs: []
+  hostnames: []

@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "jmap-mcp.fullname" . }}
+  labels:
+    {{- include "jmap-mcp.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "jmap-mcp.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- if .Values.proxy.enabled }}
+        checksum/config-proxy: {{ include (print $.Template.BasePath "/config-proxy.yaml") . | sha256sum }}
+        {{- if .Values.proxy.auth.enabled }}
+        checksum/secret-auth: {{ include (print $.Template.BasePath "/secret-auth.yaml") . | sha256sum }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "jmap-mcp.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "jmap-mcp.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+          - -mode=http
+          - -listen=0.0.0.0:{{ .Values.server.port }}
+          {{- if .Values.jmap.enableSend }}
+          - -enable-send
+          {{- end }}
+        env:
+        - name: JMAP_SESSION_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "jmap-mcp.secretName" . }}
+              key: {{ include "jmap-mcp.secretSessionURLKey" . }}
+        - name: JMAP_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "jmap-mcp.secretName" . }}
+              key: {{ include "jmap-mcp.secretAuthTokenKey" . }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.server.port }}
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.server.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.server.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.proxy.enabled }}
+      - name: traefik
+        image: "{{ .Values.proxy.image.repository }}:{{ .Values.proxy.image.tag }}"
+        imagePullPolicy: {{ .Values.proxy.image.pullPolicy }}
+        args:
+          - --configFile=/etc/traefik/traefik.yaml
+        ports:
+        - name: proxy
+          containerPort: {{ .Values.proxy.port }}
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            scheme: HTTP
+            port: {{ .Values.proxy.port }}
+            path: /ping
+            httpHeaders:
+              - name: Host
+                value: localhost
+          failureThreshold: 3
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            scheme: HTTP
+            port: {{ .Values.proxy.port }}
+            path: /ping
+            httpHeaders:
+              - name: Host
+                value: localhost
+          initialDelaySeconds: 30
+          failureThreshold: 3
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: config-proxy
+          mountPath: /etc/traefik/traefik.yaml
+          subPath: traefik.yaml
+        {{- if .Values.proxy.auth.enabled }}
+        - name: auth-users
+          mountPath: /etc/traefik/users
+          subPath: users
+        {{- end }}
+        resources:
+          {{- toYaml .Values.proxy.resources | nindent 12 }}
+        {{- end }}
+      {{- if .Values.proxy.enabled }}
+      volumes:
+        - name: config-proxy
+          configMap:
+            name: {{ include "jmap-mcp.fullname" . }}-proxy
+        {{- if .Values.proxy.auth.enabled }}
+        - name: auth-users
+          secret:
+            secretName: {{ include "jmap-mcp.fullname" . }}-auth
+        {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

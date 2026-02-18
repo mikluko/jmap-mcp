@@ -1,0 +1,603 @@
+package server
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/mikluko/jmap"
+	"github.com/mikluko/jmap/mail"
+	"github.com/mikluko/jmap/mail/email"
+	"github.com/mikluko/jmap/mail/mailbox"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// --- email_query ---
+
+type EmailQueryInput struct {
+	MailboxID     string `json:"mailbox_id,omitempty" jsonschema:"ID of the mailbox to search in"`
+	Query         string `json:"query,omitempty" jsonschema:"Full-text search query"`
+	From          string `json:"from,omitempty" jsonschema:"Filter by sender address"`
+	To            string `json:"to,omitempty" jsonschema:"Filter by recipient address"`
+	Subject       string `json:"subject,omitempty" jsonschema:"Filter by subject text"`
+	Before        string `json:"before,omitempty" jsonschema:"Emails before this date (RFC 3339 or YYYY-MM-DD)"`
+	After         string `json:"after,omitempty" jsonschema:"Emails after this date (RFC 3339 or YYYY-MM-DD)"`
+	HasAttachment *bool  `json:"has_attachment,omitempty" jsonschema:"Filter by attachment presence"`
+	Limit         int    `json:"limit,omitempty" jsonschema:"Maximum number of results (default 20)"`
+}
+
+var emailQueryTool = &mcp.Tool{
+	Name:        "email_query",
+	Description: "Search emails with filters, returns matching email IDs and total count (maps to JMAP Email/query)",
+}
+
+func (s *Server) handleEmailQuery(ctx context.Context, _ *mcp.CallToolRequest, in EmailQueryInput) (*mcp.CallToolResult, any, error) {
+	client, err := s.jmapClient(ctx)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	accountID := client.Session.PrimaryAccounts[mail.URI]
+	if accountID == "" {
+		return errorResult(fmt.Errorf("no primary mail account")), nil, nil
+	}
+
+	filter := &email.FilterCondition{
+		InMailbox: jmap.ID(in.MailboxID),
+		Text:      in.Query,
+		From:      in.From,
+		To:        in.To,
+		Subject:   in.Subject,
+	}
+	if in.HasAttachment != nil && *in.HasAttachment {
+		filter.HasAttachment = true
+	}
+	if in.Before != "" {
+		t, err := parseDate(in.Before, "T23:59:59Z")
+		if err != nil {
+			return errorResult(err), nil, nil
+		}
+		filter.Before = t
+	}
+	if in.After != "" {
+		t, err := parseDate(in.After, "T00:00:00Z")
+		if err != nil {
+			return errorResult(err), nil, nil
+		}
+		filter.After = t
+	}
+
+	limit := uint64(in.Limit)
+	if limit == 0 {
+		limit = 20
+	}
+
+	req := &jmap.Request{Context: ctx}
+	req.Invoke(&email.Query{
+		Account:        accountID,
+		Filter:         filter,
+		Sort:           []*email.SortComparator{{Property: "receivedAt", IsAscending: false}},
+		Limit:          limit,
+		CalculateTotal: true,
+	})
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	if len(resp.Responses) == 0 {
+		return errorResult(fmt.Errorf("empty response for Email/query")), nil, nil
+	}
+
+	switch args := resp.Responses[0].Args.(type) {
+	case *email.QueryResponse:
+		var sb strings.Builder
+		fmt.Fprintf(&sb, "Total: %d (returning %d)\n", args.Total, len(args.IDs))
+		for _, id := range args.IDs {
+			fmt.Fprintf(&sb, "%s\n", id)
+		}
+		return textResult(sb.String()), nil, nil
+	case *jmap.MethodError:
+		return errorResult(args), nil, nil
+	default:
+		return errorResult(fmt.Errorf("unexpected response type: %T", args)), nil, nil
+	}
+}
+
+// --- email_get ---
+
+type EmailGetInput struct {
+	EmailIDs    []string `json:"email_ids" jsonschema:"IDs of emails to retrieve"`
+	FullHeaders bool     `json:"full_headers,omitempty" jsonschema:"Include all raw email headers"`
+}
+
+var emailGetTool = &mcp.Tool{
+	Name:        "email_get",
+	Description: "Get full content of emails by ID, including body text (maps to JMAP Email/get)",
+}
+
+func (s *Server) handleEmailGet(ctx context.Context, _ *mcp.CallToolRequest, in EmailGetInput) (*mcp.CallToolResult, any, error) {
+	if len(in.EmailIDs) == 0 {
+		return errorResult(fmt.Errorf("email_ids is required")), nil, nil
+	}
+
+	client, err := s.jmapClient(ctx)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	accountID := client.Session.PrimaryAccounts[mail.URI]
+	if accountID == "" {
+		return errorResult(fmt.Errorf("no primary mail account")), nil, nil
+	}
+
+	properties := []string{
+		"id", "subject", "from", "to", "cc", "bcc", "replyTo",
+		"receivedAt", "sentAt", "preview", "hasAttachment", "keywords",
+		"mailboxIds", "size", "bodyValues", "textBody", "htmlBody",
+	}
+	if in.FullHeaders {
+		properties = append(properties, "headers")
+	}
+
+	req := &jmap.Request{Context: ctx}
+	req.Invoke(&email.Get{
+		Account:            accountID,
+		IDs:                toJMAPIDSlice(in.EmailIDs),
+		Properties:         properties,
+		FetchAllBodyValues: true,
+	})
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	if len(resp.Responses) == 0 {
+		return errorResult(fmt.Errorf("empty response for Email/get")), nil, nil
+	}
+
+	switch args := resp.Responses[0].Args.(type) {
+	case *email.GetResponse:
+		if len(args.NotFound) > 0 {
+			return errorResult(fmt.Errorf("emails not found: %v", args.NotFound)), nil, nil
+		}
+		if len(args.List) == 0 {
+			return errorResult(fmt.Errorf("no emails found")), nil, nil
+		}
+
+		var sb strings.Builder
+		for i, e := range args.List {
+			if i > 0 {
+				fmt.Fprintf(&sb, "\n---\n\n")
+			}
+			if in.FullHeaders && len(e.Headers) > 0 {
+				for _, h := range e.Headers {
+					fmt.Fprintf(&sb, "%s: %s\n", h.Name, strings.TrimSpace(h.Value))
+				}
+			} else {
+				fmt.Fprintf(&sb, "ID: %s\n", e.ID)
+				fmt.Fprintf(&sb, "Subject: %s\n", e.Subject)
+				if len(e.From) > 0 {
+					fmt.Fprintf(&sb, "From: %s\n", formatAddresses(e.From))
+				}
+				if len(e.To) > 0 {
+					fmt.Fprintf(&sb, "To: %s\n", formatAddresses(e.To))
+				}
+				if len(e.CC) > 0 {
+					fmt.Fprintf(&sb, "CC: %s\n", formatAddresses(e.CC))
+				}
+				if e.ReceivedAt != nil {
+					fmt.Fprintf(&sb, "Date: %s\n", e.ReceivedAt.Format(time.RFC3339))
+				}
+			}
+			fmt.Fprintln(&sb)
+
+			body := extractBody(e)
+			if body != "" {
+				sb.WriteString(body)
+			} else {
+				sb.WriteString("(no body content)")
+			}
+		}
+
+		return textResult(sb.String()), nil, nil
+	case *jmap.MethodError:
+		return errorResult(args), nil, nil
+	default:
+		return errorResult(fmt.Errorf("unexpected response type: %T", args)), nil, nil
+	}
+}
+
+// --- email_create ---
+
+type EmailCreateInput struct {
+	To      []string `json:"to,omitempty" jsonschema:"Recipient email addresses"`
+	CC      []string `json:"cc,omitempty" jsonschema:"CC email addresses"`
+	BCC     []string `json:"bcc,omitempty" jsonschema:"BCC email addresses"`
+	Subject string   `json:"subject" jsonschema:"Email subject"`
+	Body    string   `json:"body" jsonschema:"Plain text email body"`
+}
+
+var emailCreateTool = &mcp.Tool{
+	Name:        "email_create",
+	Description: "Create a new email draft in the Drafts mailbox",
+}
+
+func (s *Server) handleEmailCreate(ctx context.Context, _ *mcp.CallToolRequest, in EmailCreateInput) (*mcp.CallToolResult, any, error) {
+	client, err := s.jmapClient(ctx)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	accountID := client.Session.PrimaryAccounts[mail.URI]
+	if accountID == "" {
+		return errorResult(fmt.Errorf("no primary mail account")), nil, nil
+	}
+
+	draftsID, err := s.findMailboxByRole(ctx, client, accountID, mailbox.RoleDrafts)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	draft := &email.Email{
+		MailboxIDs: map[jmap.ID]bool{draftsID: true},
+		Keywords:   map[string]bool{"$draft": true},
+		To:         toMailAddresses(in.To),
+		CC:         toMailAddresses(in.CC),
+		BCC:        toMailAddresses(in.BCC),
+		Subject:    in.Subject,
+		BodyValues: map[string]*email.BodyValue{
+			"body": {Value: in.Body},
+		},
+		TextBody: []*email.BodyPart{
+			{PartID: "body", Type: "text/plain"},
+		},
+	}
+
+	req := &jmap.Request{Context: ctx}
+	req.Invoke(&email.Set{
+		Account: accountID,
+		Create:  map[jmap.ID]*email.Email{"draft": draft},
+	})
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	if len(resp.Responses) == 0 {
+		return errorResult(fmt.Errorf("empty response for Email/set")), nil, nil
+	}
+
+	switch args := resp.Responses[0].Args.(type) {
+	case *email.SetResponse:
+		if se, ok := args.NotCreated["draft"]; ok {
+			return errorResult(fmt.Errorf("draft creation failed: %s", se.Type)), nil, nil
+		}
+		if created, ok := args.Created["draft"]; ok {
+			return textResult(fmt.Sprintf("Created draft [id: %s]", created.ID)), nil, nil
+		}
+		return textResult("Created draft"), nil, nil
+	case *jmap.MethodError:
+		return errorResult(args), nil, nil
+	default:
+		return errorResult(fmt.Errorf("unexpected response type: %T", args)), nil, nil
+	}
+}
+
+// --- email_move ---
+
+type EmailMoveInput struct {
+	EmailIDs  []string `json:"email_ids" jsonschema:"IDs of emails to move"`
+	MailboxID string   `json:"mailbox_id" jsonschema:"Destination mailbox ID"`
+}
+
+var emailMoveTool = &mcp.Tool{
+	Name:        "email_move",
+	Description: "Move emails to a different mailbox",
+}
+
+func (s *Server) handleEmailMove(ctx context.Context, _ *mcp.CallToolRequest, in EmailMoveInput) (*mcp.CallToolResult, any, error) {
+	if len(in.EmailIDs) == 0 {
+		return errorResult(fmt.Errorf("email_ids is required")), nil, nil
+	}
+
+	client, err := s.jmapClient(ctx)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	accountID := client.Session.PrimaryAccounts[mail.URI]
+	if accountID == "" {
+		return errorResult(fmt.Errorf("no primary mail account")), nil, nil
+	}
+
+	updates := make(map[jmap.ID]jmap.Patch, len(in.EmailIDs))
+	for _, id := range in.EmailIDs {
+		updates[jmap.ID(id)] = jmap.Patch{
+			"mailboxIds": map[string]bool{in.MailboxID: true},
+		}
+	}
+
+	req := &jmap.Request{Context: ctx}
+	req.Invoke(&email.Set{
+		Account: accountID,
+		Update:  updates,
+	})
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	if len(resp.Responses) == 0 {
+		return errorResult(fmt.Errorf("empty response for Email/set")), nil, nil
+	}
+
+	switch args := resp.Responses[0].Args.(type) {
+	case *email.SetResponse:
+		var errors []string
+		for id, se := range args.NotUpdated {
+			errors = append(errors, fmt.Sprintf("%s: %s", id, se.Type))
+		}
+		if len(errors) > 0 {
+			return errorResult(fmt.Errorf("move failed: %s", strings.Join(errors, "; "))), nil, nil
+		}
+		return textResult(fmt.Sprintf("Moved %d email(s) to mailbox %s", len(in.EmailIDs), in.MailboxID)), nil, nil
+	case *jmap.MethodError:
+		return errorResult(args), nil, nil
+	default:
+		return errorResult(fmt.Errorf("unexpected response type: %T", args)), nil, nil
+	}
+}
+
+// --- email_flag ---
+
+type EmailFlagInput struct {
+	EmailIDs []string `json:"email_ids" jsonschema:"IDs of emails to update"`
+	Seen     *bool    `json:"seen,omitempty" jsonschema:"Mark as seen (true) or unseen (false)"`
+	Flagged  *bool    `json:"flagged,omitempty" jsonschema:"Mark as flagged/starred (true) or unflagged (false)"`
+	Answered *bool    `json:"answered,omitempty" jsonschema:"Mark as answered (true) or unanswered (false)"`
+	Draft    *bool    `json:"draft,omitempty" jsonschema:"Mark as draft (true) or not-draft (false)"`
+}
+
+var emailFlagTool = &mcp.Tool{
+	Name:        "email_flag",
+	Description: "Set or remove flags (seen, flagged, answered, draft) on emails",
+}
+
+func (s *Server) handleEmailFlag(ctx context.Context, _ *mcp.CallToolRequest, in EmailFlagInput) (*mcp.CallToolResult, any, error) {
+	if len(in.EmailIDs) == 0 {
+		return errorResult(fmt.Errorf("email_ids is required")), nil, nil
+	}
+
+	patch := jmap.Patch{}
+	applyKeyword(patch, "keywords/$seen", in.Seen)
+	applyKeyword(patch, "keywords/$flagged", in.Flagged)
+	applyKeyword(patch, "keywords/$answered", in.Answered)
+	applyKeyword(patch, "keywords/$draft", in.Draft)
+
+	if len(patch) == 0 {
+		return errorResult(fmt.Errorf("at least one flag must be provided")), nil, nil
+	}
+
+	client, err := s.jmapClient(ctx)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	accountID := client.Session.PrimaryAccounts[mail.URI]
+	if accountID == "" {
+		return errorResult(fmt.Errorf("no primary mail account")), nil, nil
+	}
+
+	updates := make(map[jmap.ID]jmap.Patch, len(in.EmailIDs))
+	for _, id := range in.EmailIDs {
+		updates[jmap.ID(id)] = patch
+	}
+
+	req := &jmap.Request{Context: ctx}
+	req.Invoke(&email.Set{
+		Account: accountID,
+		Update:  updates,
+	})
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	if len(resp.Responses) == 0 {
+		return errorResult(fmt.Errorf("empty response for Email/set")), nil, nil
+	}
+
+	switch args := resp.Responses[0].Args.(type) {
+	case *email.SetResponse:
+		var errors []string
+		for id, se := range args.NotUpdated {
+			errors = append(errors, fmt.Sprintf("%s: %s", id, se.Type))
+		}
+		if len(errors) > 0 {
+			return errorResult(fmt.Errorf("flag update failed: %s", strings.Join(errors, "; "))), nil, nil
+		}
+		return textResult(fmt.Sprintf("Updated flags on %d email(s)", len(in.EmailIDs))), nil, nil
+	case *jmap.MethodError:
+		return errorResult(args), nil, nil
+	default:
+		return errorResult(fmt.Errorf("unexpected response type: %T", args)), nil, nil
+	}
+}
+
+// --- email_delete ---
+
+type EmailDeleteInput struct {
+	EmailIDs  []string `json:"email_ids" jsonschema:"IDs of emails to delete"`
+	Permanent bool     `json:"permanent,omitempty" jsonschema:"Permanently destroy emails instead of moving to Trash (default false)"`
+}
+
+var emailDeleteTool = &mcp.Tool{
+	Name:        "email_delete",
+	Description: "Delete emails by moving to Trash, or permanently destroy them",
+}
+
+func (s *Server) handleEmailDelete(ctx context.Context, _ *mcp.CallToolRequest, in EmailDeleteInput) (*mcp.CallToolResult, any, error) {
+	if len(in.EmailIDs) == 0 {
+		return errorResult(fmt.Errorf("email_ids is required")), nil, nil
+	}
+
+	client, err := s.jmapClient(ctx)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	accountID := client.Session.PrimaryAccounts[mail.URI]
+	if accountID == "" {
+		return errorResult(fmt.Errorf("no primary mail account")), nil, nil
+	}
+
+	if in.Permanent {
+		ids := make([]jmap.ID, len(in.EmailIDs))
+		for i, id := range in.EmailIDs {
+			ids[i] = jmap.ID(id)
+		}
+
+		req := &jmap.Request{Context: ctx}
+		req.Invoke(&email.Set{
+			Account: accountID,
+			Destroy: ids,
+		})
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return errorResult(err), nil, nil
+		}
+
+		if len(resp.Responses) == 0 {
+			return errorResult(fmt.Errorf("empty response for Email/set")), nil, nil
+		}
+
+		switch args := resp.Responses[0].Args.(type) {
+		case *email.SetResponse:
+			var errors []string
+			for id, se := range args.NotDestroyed {
+				errors = append(errors, fmt.Sprintf("%s: %s", id, se.Type))
+			}
+			if len(errors) > 0 {
+				return errorResult(fmt.Errorf("destroy failed: %s", strings.Join(errors, "; "))), nil, nil
+			}
+			return textResult(fmt.Sprintf("Permanently destroyed %d email(s)", len(in.EmailIDs))), nil, nil
+		case *jmap.MethodError:
+			return errorResult(args), nil, nil
+		default:
+			return errorResult(fmt.Errorf("unexpected response type: %T", args)), nil, nil
+		}
+	}
+
+	// Soft delete: find Trash mailbox, then move emails there.
+	trashID, err := s.findMailboxByRole(ctx, client, accountID, mailbox.RoleTrash)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	updates := make(map[jmap.ID]jmap.Patch, len(in.EmailIDs))
+	for _, id := range in.EmailIDs {
+		updates[jmap.ID(id)] = jmap.Patch{
+			"mailboxIds": map[string]bool{string(trashID): true},
+		}
+	}
+
+	req := &jmap.Request{Context: ctx}
+	req.Invoke(&email.Set{
+		Account: accountID,
+		Update:  updates,
+	})
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	if len(resp.Responses) == 0 {
+		return errorResult(fmt.Errorf("empty response for Email/set")), nil, nil
+	}
+
+	switch args := resp.Responses[0].Args.(type) {
+	case *email.SetResponse:
+		var errors []string
+		for id, se := range args.NotUpdated {
+			errors = append(errors, fmt.Sprintf("%s: %s", id, se.Type))
+		}
+		if len(errors) > 0 {
+			return errorResult(fmt.Errorf("trash failed: %s", strings.Join(errors, "; "))), nil, nil
+		}
+		return textResult(fmt.Sprintf("Moved %d email(s) to Trash", len(in.EmailIDs))), nil, nil
+	case *jmap.MethodError:
+		return errorResult(args), nil, nil
+	default:
+		return errorResult(fmt.Errorf("unexpected response type: %T", args)), nil, nil
+	}
+}
+
+// --- email helpers ---
+
+func formatAddresses(addrs []*mail.Address) string {
+	parts := make([]string, len(addrs))
+	for i, a := range addrs {
+		parts[i] = a.String()
+	}
+	return strings.Join(parts, ", ")
+}
+
+func extractBody(e *email.Email) string {
+	for _, part := range e.TextBody {
+		if bv, ok := e.BodyValues[part.PartID]; ok {
+			return bv.Value
+		}
+	}
+	for _, part := range e.HTMLBody {
+		if bv, ok := e.BodyValues[part.PartID]; ok {
+			return bv.Value
+		}
+	}
+	return ""
+}
+
+// parseDate parses a date string as RFC 3339, normalizing bare dates (YYYY-MM-DD)
+// by appending the given time suffix first.
+func parseDate(s, timeSuffix string) (*time.Time, error) {
+	if len(s) == 10 && s[4] == '-' && s[7] == '-' {
+		s = s + timeSuffix
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return nil, fmt.Errorf("invalid date format %q: expected YYYY-MM-DD or RFC 3339", s)
+	}
+	return &t, nil
+}
+
+// toMailAddresses converts a slice of email strings to JMAP Address objects.
+func toMailAddresses(addrs []string) []*mail.Address {
+	if len(addrs) == 0 {
+		return nil
+	}
+	result := make([]*mail.Address, len(addrs))
+	for i, a := range addrs {
+		result[i] = &mail.Address{Email: a}
+	}
+	return result
+}
+
+// applyKeyword sets a JMAP keyword patch entry. true adds the keyword, false removes it.
+func applyKeyword(patch jmap.Patch, key string, val *bool) {
+	if val == nil {
+		return
+	}
+	if *val {
+		patch[key] = true
+	} else {
+		patch[key] = nil
+	}
+}

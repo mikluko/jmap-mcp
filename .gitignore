@@ -1,0 +1,5 @@
+.*
+!.gitignore
+!.ko.yaml
+!.helmignore
+/jmap-mcp
