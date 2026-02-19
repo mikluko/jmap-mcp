@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"strings"
 )
 
 type contextKey struct{ name string }
@@ -20,11 +21,19 @@ func TokenFromContext(ctx context.Context) string {
 	return v
 }
 
-// TokenQueryMiddleware is HTTP middleware that extracts jmap_token from the
-// query string and stores it in the request context.
-func TokenQueryMiddleware(next http.Handler) http.Handler {
+// TokenMiddleware is HTTP middleware that extracts the JMAP auth token from
+// the request and stores it in the request context. It checks, in order:
+//  1. jmap_token query parameter
+//  2. Authorization: Bearer <token> header
+func TokenMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if token := r.URL.Query().Get("jmap_token"); token != "" {
+		var token string
+		if token = r.URL.Query().Get("jmap_token"); token == "" {
+			if v := r.Header.Get("Authorization"); v != "" {
+				token, _ = strings.CutPrefix(v, "Bearer ")
+			}
+		}
+		if token != "" {
 			r = r.WithContext(ContextWithToken(r.Context(), token))
 		}
 		next.ServeHTTP(w, r)

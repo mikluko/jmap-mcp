@@ -60,7 +60,7 @@ func runHTTP(srv *server.Server, addr string) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
-	mux.Handle("/", server.TokenQueryMiddleware(mcpHandler))
+	mux.Handle("/", server.TokenMiddleware(mcpHandler))
 
 	log.Printf("Starting HTTP server on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
