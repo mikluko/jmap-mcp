@@ -61,7 +61,7 @@ Tools map closely to JMAP methods. Email mutation tools provide structured conve
 | `-enable-send`   | `false` | Enable the `email_submission_set` tool (off by default)                     |
 | `-enable-sieve`  | `false` | Enable Sieve script tools (off by default, requires JMAP server support)    |
 
-In HTTP mode, the token can come from the `jmap_token` query parameter.
+In HTTP mode, the token can be passed per-request via `Authorization: Bearer <token>` header or `jmap_token` query parameter (query parameter takes precedence).
 
 ## Installation
 
@@ -73,7 +73,7 @@ helm install jmap-mcp oci://ghcr.io/mikluko/helm-charts/jmap-mcp \
   --set jmap.sessionURL="https://api.fastmail.com/jmap/session"
 ```
 
-In HTTP mode, JMAP auth tokens are passed per-request via `?jmap_token=` query parameter — no static tokens are stored in the cluster.
+In HTTP mode, JMAP auth tokens are passed per-request via `Authorization: Bearer` header or `?jmap_token=` query parameter — no static tokens are stored in the cluster.
 
 ### Binary
 
