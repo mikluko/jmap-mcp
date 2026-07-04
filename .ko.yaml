@@ -1,6 +1,6 @@
-defaultBaseImage: cgr.dev/chainguard/static:latest
+defaultBaseImage: gcr.io/distroless/static:nonroot
 baseImageOverrides:
-  github.com/mikluko/jmap-mcp: cgr.dev/chainguard/static:latest
+  github.com/mikluko/jmap-mcp: gcr.io/distroless/static:nonroot
 
 builds:
   - id: jmap-mcp
