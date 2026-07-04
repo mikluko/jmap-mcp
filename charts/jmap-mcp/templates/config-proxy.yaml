@@ -12,7 +12,10 @@ data:
         address: ":{{ .Values.proxy.port }}"
         # Trust X-Forwarded-* from the upstream ingress/gateway so the
         # backend can derive the external base URL for signed attachment
-        # links. Spoofed headers only mislead the spoofer's own links.
+        # links. If the edge forwards client-supplied X-Forwarded-Host
+        # unfiltered, a header injector could point generated links at
+        # their own host; set jmap.attachmentURL.externalURL to pin the
+        # base URL instead of deriving it.
         forwardedHeaders:
           insecure: true
 
@@ -31,6 +34,15 @@ data:
 
     http:
       routers:
+        # Signed attachment downloads: the URL path is a sealed capability
+        # embedding the JMAP token, so it must never reach access logs, and
+        # the link must be fetchable without basic auth (the signature is
+        # the sole access control).
+        attachments:
+          rule: "PathPrefix(`/attachments/`)"
+          service: mcp-backend
+          observability:
+            accessLogs: false
         mcp:
           rule: "PathPrefix(`/`)"
           service: mcp-backend
