@@ -49,6 +49,46 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+Name of the Secret holding the attachment URL sealing key.
+*/}}
+{{- define "jmap-mcp.attachmentSecretName" -}}
+{{- if .Values.jmap.attachmentURL.existingSecret.name }}
+{{- .Values.jmap.attachmentURL.existingSecret.name }}
+{{- else }}
+{{- printf "%s-attachment" (include "jmap-mcp.fullname" .) }}
+{{- end }}
+{{- end }}
+
+{{/*
+Key within the attachment Secret.
+*/}}
+{{- define "jmap-mcp.attachmentSecretKey" -}}
+{{- if .Values.jmap.attachmentURL.existingSecret.name }}
+{{- .Values.jmap.attachmentURL.existingSecret.key }}
+{{- else }}
+{{- "secret" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Base64-encoded attachment URL sealing key for the chart-managed Secret.
+Precedence: explicit value, then the value already stored in the cluster
+(so upgrades do not rotate it), then a freshly generated random key.
+*/}}
+{{- define "jmap-mcp.attachmentSecretValue" -}}
+{{- if .Values.jmap.attachmentURL.secret }}
+{{- .Values.jmap.attachmentURL.secret | b64enc }}
+{{- else }}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace (printf "%s-attachment" (include "jmap-mcp.fullname" .)) }}
+{{- if and $existing (index $existing.data "secret") }}
+{{- index $existing.data "secret" }}
+{{- else }}
+{{- randAlphaNum 32 | b64enc }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "jmap-mcp.serviceAccountName" -}}

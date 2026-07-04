@@ -14,6 +14,9 @@ spec:
   template:
     metadata:
       annotations:
+        {{- if not .Values.jmap.attachmentURL.existingSecret.name }}
+        checksum/secret-attachment: {{ include (print $.Template.BasePath "/secret-attachment.yaml") . | sha256sum }}
+        {{- end }}
         {{- if .Values.proxy.enabled }}
         checksum/config-proxy: {{ include (print $.Template.BasePath "/config-proxy.yaml") . | sha256sum }}
         {{- if .Values.proxy.auth.enabled }}
@@ -51,9 +54,17 @@ spec:
           {{- if .Values.jmap.enableSieve }}
           - -enable-sieve
           {{- end }}
+          {{- with .Values.jmap.attachmentURL.externalURL }}
+          - -external-url={{ . }}
+          {{- end }}
         env:
         - name: JMAP_SESSION_URL
           value: {{ required "jmap.sessionURL is required" .Values.jmap.sessionURL | quote }}
+        - name: ATTACHMENT_URL_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "jmap-mcp.attachmentSecretName" . }}
+              key: {{ include "jmap-mcp.attachmentSecretKey" . }}
         ports:
         - name: http
           containerPort: {{ .Values.server.port }}

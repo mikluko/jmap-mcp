@@ -22,6 +22,22 @@ jmap:
   # Enable Sieve script tools (disabled by default, requires server support)
   enableSieve: false
 
+  # Signed attachment URL settings (email_attachment_url tool).
+  # URLs are sealed capabilities served from /attachments/ and expire 30 s
+  # after issuance.
+  attachmentURL:
+    # External base URL for generated links (e.g. https://jmap-mcp.example.com).
+    # Empty: derived per-request from X-Forwarded-Proto/X-Forwarded-Host.
+    externalURL: ""
+    # Secret sealing URL claims. Must be shared across replicas so a URL
+    # issued by one replica can be served by another.
+    # Empty: auto-generated once and persisted in a chart-managed Secret.
+    secret: ""
+    # Use an existing Secret instead (takes precedence over .secret).
+    existingSecret:
+      name: ""
+      key: "secret"
+
 server:
   port: 8080
 

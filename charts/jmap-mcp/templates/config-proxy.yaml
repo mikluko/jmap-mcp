@@ -10,6 +10,11 @@ data:
     entryPoints:
       web:
         address: ":{{ .Values.proxy.port }}"
+        # Trust X-Forwarded-* from the upstream ingress/gateway so the
+        # backend can derive the external base URL for signed attachment
+        # links. Spoofed headers only mislead the spoofer's own links.
+        forwardedHeaders:
+          insecure: true
 
     log:
       level: INFO
