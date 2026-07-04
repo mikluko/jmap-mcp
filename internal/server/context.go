@@ -8,7 +8,10 @@ import (
 
 type contextKey struct{ name string }
 
-var jmapTokenKey = contextKey{"jmap-token"}
+var (
+	jmapTokenKey = contextKey{"jmap-token"}
+	baseURLKey   = contextKey{"base-url"}
+)
 
 // ContextWithToken returns a new context with the JMAP auth token stored.
 func ContextWithToken(ctx context.Context, token string) context.Context {
@@ -35,6 +38,43 @@ func TokenMiddleware(next http.Handler) http.Handler {
 		}
 		if token != "" {
 			r = r.WithContext(ContextWithToken(r.Context(), token))
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// ContextWithBaseURL returns a new context carrying the external base URL of
+// the server (scheme://host, no trailing slash).
+func ContextWithBaseURL(ctx context.Context, base string) context.Context {
+	return context.WithValue(ctx, baseURLKey, base)
+}
+
+// BaseURLFromContext extracts the external base URL from the context, or
+// returns empty string.
+func BaseURLFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(baseURLKey).(string)
+	return v
+}
+
+// BaseURLMiddleware is HTTP middleware that derives the server's external
+// base URL from the request (honoring X-Forwarded-Proto and X-Forwarded-Host)
+// and stores it in the request context for tool handlers to build absolute URLs.
+func BaseURLMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		scheme := r.Header.Get("X-Forwarded-Proto")
+		if scheme == "" {
+			if r.TLS != nil {
+				scheme = "https"
+			} else {
+				scheme = "http"
+			}
+		}
+		host := r.Header.Get("X-Forwarded-Host")
+		if host == "" {
+			host = r.Host
+		}
+		if host != "" {
+			r = r.WithContext(ContextWithBaseURL(r.Context(), scheme+"://"+host))
 		}
 		next.ServeHTTP(w, r)
 	})

@@ -14,6 +14,8 @@ type Config struct {
 	AuthToken             string // JMAP bearer token (optional in http mode)
 	EnableEmailSubmission bool   // enable email_submission_set tool
 	EnableSieve           bool   // enable sieve tools
+	AttachmentURLSecret   string // secret for sealing URL claims (ATTACHMENT_URL_SECRET)
+	ExternalURL           string // explicit external base URL for signed links
 }
 
 // LoadConfig parses command-line flags and environment variables.
@@ -24,6 +26,7 @@ func LoadConfig() (*Config, error) {
 	flag.StringVar(&cfg.ListenAddr, "listen", ":8080", "HTTP listen address (http mode only)")
 	flag.BoolVar(&cfg.EnableEmailSubmission, "enable-send", false, "Enable email_submission_set tool (disabled by default for safety)")
 	flag.BoolVar(&cfg.EnableSieve, "enable-sieve", false, "Enable Sieve script tools (disabled by default, requires server support)")
+	flag.StringVar(&cfg.ExternalURL, "external-url", "", "External base URL for signed attachment links (default: derived from the request)")
 	flag.Parse()
 
 	cfg.SessionURL = os.Getenv("JMAP_SESSION_URL")
@@ -32,6 +35,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	cfg.AuthToken = os.Getenv("JMAP_AUTH_TOKEN")
+	cfg.AttachmentURLSecret = os.Getenv("ATTACHMENT_URL_SECRET")
 
 	if cfg.Mode == "stdio" && cfg.AuthToken == "" {
 		return nil, fmt.Errorf("JMAP_AUTH_TOKEN environment variable is required in stdio mode")

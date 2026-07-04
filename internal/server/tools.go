@@ -26,6 +26,8 @@ const serverInstructions = `JMAP MCP Server — email and Sieve script managemen
 
 **Managing email**: use email_move to move between mailboxes, email_flag to mark as read/flagged/answered, email_delete to trash or permanently destroy.
 
+**Attachments**: email_get lists each email's attachments with their blob IDs; pass an email ID (and blob ID when there are several) to email_attachment_url (available in HTTP mode only) to obtain a signed download URL. The URL expires 30 seconds after issuance — fetch it immediately with any HTTP client.
+
 **Managing mailboxes**: use mailbox_set to create, rename, reparent, or destroy mailboxes.
 
 **Sieve scripts**: use sieve_get to list or read scripts, sieve_set to create/update/destroy, sieve_validate to check syntax without saving.
@@ -73,6 +75,11 @@ func (s *Server) registerTools() {
 
 	// Identity tools (Identity/get)
 	mcp.AddTool(s.mcp, identityGetTool, s.handleIdentityGet)
+
+	// Feature-gated: email_attachment_url requires http mode (signed URL endpoint)
+	if s.attachmentURL != nil {
+		mcp.AddTool(s.mcp, emailAttachmentURLTool, s.handleEmailAttachmentURL)
+	}
 
 	// Feature-gated: email_submission_set requires -enable-send flag
 	if s.enableEmailSubmission {

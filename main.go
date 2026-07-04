@@ -32,6 +32,9 @@ func main() {
 	if cfg.EnableSieve {
 		opts = append(opts, server.WithSieve())
 	}
+	if cfg.Mode == "http" {
+		opts = append(opts, server.WithAttachmentURL(cfg.AttachmentURLSecret, cfg.ExternalURL))
+	}
 	srv := server.NewServer(version, cfg.SessionURL, opts...)
 
 	switch cfg.Mode {
@@ -60,7 +63,8 @@ func runHTTP(srv *server.Server, addr string) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
-	mux.Handle("/", server.TokenMiddleware(mcpHandler))
+	mux.Handle("/attachments/", srv.AttachmentHandler())
+	mux.Handle("/", server.BaseURLMiddleware(server.TokenMiddleware(mcpHandler)))
 
 	log.Printf("Starting HTTP server on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {

@@ -26,6 +26,7 @@ Tools map closely to JMAP methods. Email mutation tools provide structured conve
 | `email_move`   | `Email/set`  | Move emails to a different mailbox                             |
 | `email_flag`   | `Email/set`  | Set or remove flags (seen, flagged, answered, draft)           |
 | `email_delete` | `Email/set`  | Delete emails (move to Trash or permanently destroy)           |
+| `email_attachment_url` | Blob download | Signed URL streaming an attachment, expires in 30 s (HTTP mode only) |
 
 ### Identity
 
@@ -49,19 +50,23 @@ Tools map closely to JMAP methods. Email mutation tools provide structured conve
 
 ## Configuration
 
-| Env var            | Required   | Description                                                          |
-|--------------------|------------|----------------------------------------------------------------------|
-| `JMAP_SESSION_URL` | always     | JMAP session endpoint (e.g. `https://api.fastmail.com/jmap/session`) |
-| `JMAP_AUTH_TOKEN`  | stdio mode | Bearer token for JMAP authentication                                 |
+| Env var                | Required   | Description                                                          |
+|------------------------|------------|----------------------------------------------------------------------|
+| `JMAP_SESSION_URL`     | always     | JMAP session endpoint (e.g. `https://api.fastmail.com/jmap/session`) |
+| `JMAP_AUTH_TOKEN`      | stdio mode | Bearer token for JMAP authentication                                 |
+| `ATTACHMENT_URL_SECRET`| no         | Secret sealing signed attachment URLs; set for multi-replica deployments (default: random per-process key) |
 
-| Flag             | Default | Description                                    |
-|------------------|---------|------------------------------------------------|
-| `-mode`          | `stdio` | Server mode: `stdio` or `http`                 |
-| `-listen`        | `:8080` | HTTP listen address (http mode only)           |
-| `-enable-send`   | `false` | Enable the `email_submission_set` tool (off by default)                     |
-| `-enable-sieve`  | `false` | Enable Sieve script tools (off by default, requires JMAP server support)    |
+| Flag                  | Default | Description                                    |
+|-----------------------|---------|------------------------------------------------|
+| `-mode`               | `stdio` | Server mode: `stdio` or `http`                 |
+| `-listen`             | `:8080` | HTTP listen address (http mode only)           |
+| `-enable-send`        | `false` | Enable the `email_submission_set` tool (off by default)                     |
+| `-enable-sieve`       | `false` | Enable Sieve script tools (off by default, requires JMAP server support)    |
+| `-external-url`       | derived | External base URL for signed attachment links; default derives from the request (`X-Forwarded-Proto`/`X-Forwarded-Host` aware) |
 
 In HTTP mode, the token can be passed per-request via `Authorization: Bearer <token>` header or `jmap_token` query parameter (query parameter takes precedence).
+
+In HTTP mode, `email_attachment_url` returns a link served from `/attachments/` that expires 30 seconds after issuance. The link is an AES-GCM sealed capability: it embeds the JMAP token, account, and blob IDs, so the endpoint streams the attachment from the JMAP server without any additional authentication and stores nothing on disk.
 
 ## Installation
 

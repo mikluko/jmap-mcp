@@ -183,7 +183,7 @@ const defaultMaxChars = 50000
 
 var emailGetTool = &mcp.Tool{
 	Name:        "email_get",
-	Description: "Get full content of emails by ID, including body text, flags, and mailbox membership. Set full_headers to include all raw headers. Use email_query first to obtain IDs. Response is capped at max_chars (default 50000); excess emails are omitted with an advisory — reduce batch size if truncated.",
+	Description: "Get full content of emails by ID, including body text, flags, mailbox membership, and attachment list with blob IDs (download via email_attachment_get). Set full_headers to include all raw headers. Use email_query first to obtain IDs. Response is capped at max_chars (default 50000); excess emails are omitted with an advisory — reduce batch size if truncated.",
 	Annotations: readOnlyAnnotations,
 }
 
@@ -206,6 +206,7 @@ func (s *Server) handleEmailGet(ctx context.Context, _ *mcp.CallToolRequest, in 
 		"id", "subject", "from", "to", "cc", "bcc", "replyTo",
 		"receivedAt", "sentAt", "preview", "hasAttachment", "keywords",
 		"mailboxIds", "size", "bodyValues", "textBody", "htmlBody",
+		"attachments",
 	}
 	if in.FullHeaders {
 		properties = append(properties, "headers")
@@ -269,6 +270,9 @@ func (s *Server) handleEmailGet(ctx context.Context, _ *mcp.CallToolRequest, in 
 				if e.ReceivedAt != nil {
 					fmt.Fprintf(&hdr, "Date: %s\n", e.ReceivedAt.Format(time.RFC3339))
 				}
+			}
+			if len(e.Attachments) > 0 {
+				fmt.Fprintf(&hdr, "Attachments:\n%s\n", formatAttachmentList(e.Attachments, "  "))
 			}
 			fmt.Fprintln(&hdr)
 

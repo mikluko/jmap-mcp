@@ -33,6 +33,22 @@ func WithSieve() Option {
 	return func(s *Server) { s.enableSieve = true }
 }
 
+// WithAttachmentURL enables the email_attachment_url tool and the
+// /attachments/ streaming endpoint (http mode only). secret seals URL claims;
+// empty means a random per-process key. externalURL overrides the
+// request-derived base URL when building download links.
+func WithAttachmentURL(secret string, externalURL string) Option {
+	return func(s *Server) {
+		urler, err := newAttachmentURLer(secret)
+		if err != nil {
+			// crypto/rand or AES setup failure is unrecoverable at startup
+			panic(fmt.Sprintf("attachment URL setup: %v", err))
+		}
+		s.attachmentURL = urler
+		s.externalURL = externalURL
+	}
+}
+
 // Server wraps the MCP server and JMAP client.
 type Server struct {
 	mcp                   *mcp.Server
@@ -40,6 +56,8 @@ type Server struct {
 	token                 string // static token for stdio mode; empty in HTTP-only mode
 	enableEmailSubmission bool
 	enableSieve           bool
+	attachmentURL         *attachmentURLer // nil unless signed attachment URLs are enabled
+	externalURL           string           // explicit base URL for signed download links
 }
 
 // NewServer creates a new MCP server with JMAP tools.
