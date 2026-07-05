@@ -27,7 +27,10 @@ jmap:
   # after issuance.
   attachmentURL:
     # External base URL for generated links (e.g. https://jmap-mcp.example.com).
-    # Empty: derived per-request from X-Forwarded-Proto/X-Forwarded-Host.
+    # Empty: derived per-request from X-Forwarded-Proto/X-Forwarded-Host. If
+    # the edge forwards client-supplied X-Forwarded-Host unfiltered, a header
+    # injector could point generated links at their own host; set this to pin
+    # the base URL instead of deriving it.
     externalURL: ""
     # Secret sealing URL claims. Must be shared across replicas so a URL
     # issued by one replica can be served by another.
@@ -40,37 +43,6 @@ jmap:
 
 server:
   port: 8080
-
-# Traefik proxy sidecar (always deployed for access logging)
-proxy:
-  enabled: true
-  # Traefik image
-  image:
-    repository: traefik
-    tag: "v3.2"
-    pullPolicy: IfNotPresent
-  # Traefik listens on this port
-  port: 8081
-  # Resource limits for Traefik sidecar
-  resources:
-    limits:
-      cpu: 100m
-      memory: 64Mi
-    requests:
-      cpu: 50m
-      memory: 32Mi
-
-  # Optional basic authentication
-  auth:
-    # Enable basic auth protection
-    enabled: false
-    # Basic auth username (ignored if htpasswd is set)
-    username: "admin"
-    # Basic auth password (will be bcrypt hashed, ignored if htpasswd is set)
-    password: ""
-    # Complete htpasswd entry (takes precedence over username/password)
-    # Generate with: htpasswd -nbB admin your-password
-    htpasswd: ""
 
 serviceAccount:
   create: true

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -52,6 +53,9 @@ func runStdio(srv *server.Server) {
 }
 
 func runHTTP(srv *server.Server, addr string) {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	srv.MCP().AddReceivingMiddleware(server.AccessLogMiddleware(logger))
+
 	mcpHandler := mcp.NewStreamableHTTPHandler(
 		func(*http.Request) *mcp.Server { return srv.MCP() },
 		nil,
@@ -64,7 +68,7 @@ func runHTTP(srv *server.Server, addr string) {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 	mux.Handle("/attachments/", srv.AttachmentHandler())
-	mux.Handle("/", server.BaseURLMiddleware(server.TokenMiddleware(mcpHandler)))
+	mux.Handle("/", server.RemoteAddrMiddleware(server.BaseURLMiddleware(server.TokenMiddleware(mcpHandler))))
 
 	log.Printf("Starting HTTP server on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {

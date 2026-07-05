@@ -17,12 +17,6 @@ spec:
         {{- if not .Values.jmap.attachmentURL.existingSecret.name }}
         checksum/secret-attachment: {{ include (print $.Template.BasePath "/secret-attachment.yaml") . | sha256sum }}
         {{- end }}
-        {{- if .Values.proxy.enabled }}
-        checksum/config-proxy: {{ include (print $.Template.BasePath "/config-proxy.yaml") . | sha256sum }}
-        {{- if .Values.proxy.auth.enabled }}
-        checksum/secret-auth: {{ include (print $.Template.BasePath "/secret-auth.yaml") . | sha256sum }}
-        {{- end }}
-        {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -83,63 +77,6 @@ spec:
           periodSeconds: 5
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
-      {{- if .Values.proxy.enabled }}
-      - name: traefik
-        image: "{{ .Values.proxy.image.repository }}:{{ .Values.proxy.image.tag }}"
-        imagePullPolicy: {{ .Values.proxy.image.pullPolicy }}
-        args:
-          - --configFile=/etc/traefik/traefik.yaml
-        ports:
-        - name: proxy
-          containerPort: {{ .Values.proxy.port }}
-          protocol: TCP
-        readinessProbe:
-          httpGet:
-            scheme: HTTP
-            port: {{ .Values.proxy.port }}
-            path: /ping
-            httpHeaders:
-              - name: Host
-                value: localhost
-          failureThreshold: 3
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          timeoutSeconds: 5
-        livenessProbe:
-          httpGet:
-            scheme: HTTP
-            port: {{ .Values.proxy.port }}
-            path: /ping
-            httpHeaders:
-              - name: Host
-                value: localhost
-          initialDelaySeconds: 30
-          failureThreshold: 3
-          periodSeconds: 10
-          timeoutSeconds: 5
-        volumeMounts:
-        - name: config-proxy
-          mountPath: /etc/traefik/traefik.yaml
-          subPath: traefik.yaml
-        {{- if .Values.proxy.auth.enabled }}
-        - name: auth-users
-          mountPath: /etc/traefik/users
-          subPath: users
-        {{- end }}
-        resources:
-          {{- toYaml .Values.proxy.resources | nindent 12 }}
-        {{- end }}
-      {{- if .Values.proxy.enabled }}
-      volumes:
-        - name: config-proxy
-          configMap:
-            name: {{ include "jmap-mcp.fullname" . }}-proxy
-        {{- if .Values.proxy.auth.enabled }}
-        - name: auth-users
-          secret:
-            secretName: {{ include "jmap-mcp.fullname" . }}-auth
-        {{- end }}
-      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -12,7 +12,7 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: {{ if .Values.proxy.enabled }}proxy{{ else }}http{{ end }}
+      targetPort: http
       protocol: TCP
       name: http
   selector:
