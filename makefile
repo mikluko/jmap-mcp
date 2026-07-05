@@ -1,9 +1,13 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build image package publish test test-coverage lint clean install run-stdio run-http
+.PHONY: help build image package publish test test-coverage lint clean install run-stdio run-http \
+        release/major release/minor release/micro
 
-# Variables
-GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.0.0-$(shell git rev-parse --short HEAD)")
+# Version derived from git tags (e.g. v0.9.0 -> 0.9.0). Without a tag, fall
+# back to a SemVer-valid pre-release (0.0.0-<sha>) so `helm package --version`
+# accepts it. --always is intentionally omitted: a bare SHA would shadow the
+# fallback and break the chart version.
+GIT_VERSION := $(shell git describe --tags --dirty 2>/dev/null || echo "0.0.0-$(shell git rev-parse --short HEAD)")
 VERSION := $(GIT_VERSION:v%=%)
 KO_DOCKER_REPO := ghcr.io/mikluko/jmap-mcp
 CHART_REPO := ghcr.io/mikluko/helm-charts
@@ -14,7 +18,7 @@ help: ## Show this help message
 	@echo 'Usage: make [target]'
 	@echo ''
 	@echo 'Available targets:'
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_\/-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # Build targets
 build: image package server-json ## Build and push container image, Helm chart, and server.json
@@ -61,6 +65,47 @@ server-json: ## Generate server.json from template
 # MCP Registry
 publish: server-json ## Publish server to MCP Registry (requires mcp-publisher)
 	mcp-publisher login github -token $$(gh auth token) && mcp-publisher publish .build/server.json
+
+# --- release: bump version -> tag -> push -> build ----------------------------
+# release/<level> bumps the chosen component (major|minor|micro) via
+# caarlos0/svu, creates an annotated tag, pushes it, and runs `build` to
+# publish the image, chart, and server.json at the new version. You pick the
+# level explicitly; svu does not infer it from commit history. On main a clean
+# worktree is required; off main it produces a prerelease tagged with the
+# short HEAD hash (-dirty on a dirty tree). RELEASE=vX.Y.Z forces an exact
+# version and skips svu.
+RELEASE ?=
+REMOTE  ?= origin
+
+# svu_rev,<level>: resolve the version string for the given bump level.
+define svu_rev
+	branch=$$(git branch --show-current); \
+	dirty=$$(git status --porcelain); \
+	hash=$$(git rev-parse --short=7 HEAD); \
+	if [ "$$branch" = main ] && [ -n "$$dirty" ]; then \
+		echo 'worktree dirty; commit or stash before tagging on main' >&2; exit 1; \
+	fi; \
+	if [ -n '$(RELEASE)' ]; then rel='$(RELEASE)'; \
+	elif [ "$$branch" = main ]; then rel=$$(svu $(1)); \
+	else rel=$$(svu $(1) --prerelease "$$hash$$([ -n "$$dirty" ] && printf -- -dirty)"); \
+	fi
+endef
+
+define do_release
+	@set -e; $(call svu_rev,$(1)); \
+	printf 'tag %s on branch %s, push to %s, and build? [y/N] ' "$$rel" "$$branch" '$(REMOTE)'; \
+	read ans; [ "$$ans" = y ] || [ "$$ans" = Y ] || { echo aborted; exit 1; }; \
+	git tag -a "$$rel" -m "$$rel"; \
+	git push $(REMOTE) "$$rel"; \
+	$(MAKE) build
+endef
+
+release/major: ## Bump major, tag, push, build (RELEASE=vX.Y.Z to force)
+	$(call do_release,major)
+release/minor: ## Bump minor, tag, push, build (RELEASE=vX.Y.Z to force)
+	$(call do_release,minor)
+release/micro: ## Bump patch, tag, push, build (RELEASE=vX.Y.Z to force)
+	$(call do_release,patch)
 
 # Local development
 run-stdio: ## Run in stdio mode locally
