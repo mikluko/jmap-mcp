@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mikluko/jmap"
-	"github.com/mikluko/jmap/mail"
-	"github.com/mikluko/jmap/mail/emailsubmission"
-	"github.com/mikluko/jmap/mail/identity"
-	"github.com/mikluko/jmap/mail/mailbox"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"sarak.sh/mikluko/jmap"
+	"sarak.sh/mikluko/jmap/mail"
+	"sarak.sh/mikluko/jmap/mail/emailsubmission"
+	"sarak.sh/mikluko/jmap/mail/identity"
+	"sarak.sh/mikluko/jmap/mail/mailbox"
 )
 
 // --- email_submission_set ---

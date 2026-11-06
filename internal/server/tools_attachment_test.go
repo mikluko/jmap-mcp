@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mikluko/jmap/mail/email"
+	"sarak.sh/mikluko/jmap/mail/email"
 )
 
 func TestSelectAttachment(t *testing.T) {

@@ -1,6 +1,6 @@
 defaultBaseImage: gcr.io/distroless/static:nonroot
 baseImageOverrides:
-  github.com/mikluko/jmap-mcp: gcr.io/distroless/static:nonroot
+  sarak.sh/mikluko/jmap-mcp: gcr.io/distroless/static:nonroot
 
 builds:
   - id: jmap-mcp

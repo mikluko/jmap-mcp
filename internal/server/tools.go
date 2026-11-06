@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mikluko/jmap"
-	"github.com/mikluko/jmap/mail/mailbox"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"sarak.sh/mikluko/jmap"
+	"sarak.sh/mikluko/jmap/mail/mailbox"
 )
 
 const serverInstructions = `JMAP MCP Server — email and Sieve script management via JMAP protocol.

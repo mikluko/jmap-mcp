@@ -3,7 +3,7 @@
 MCP server exposing JMAP email and Sieve script operations as tools.
 
 Built with the Go MCP SDK ([go-sdk](https://github.com/modelcontextprotocol/go-sdk))
-and [go-jmap](https://github.com/mikluko/jmap) library.
+and [jmap](https://sarak.sh/mikluko/jmap) library.
 
 ## Tools
 
@@ -73,23 +73,39 @@ In HTTP mode, `email_attachment_url` returns a link served from `/attachments/` 
 ### Kubernetes (Helm)
 
 ```bash
-helm install jmap-mcp oci://ghcr.io/mikluko/helm-charts/jmap-mcp \
-  --version 0.1.0 \
+helm install jmap-mcp oci://sarak.sh/mikluko/charts/jmap-mcp \
+  --version <version> \
   --set jmap.sessionURL="https://api.fastmail.com/jmap/session"
 ```
 
 In HTTP mode, JMAP auth tokens are passed per-request via `Authorization: Bearer` header or `?jmap_token=` query parameter — no static tokens are stored in the cluster.
 
+The image is `sarak.sh/mikluko/jmap-mcp:<version>`.
+
+### Debian package
+
+Releases publish `.deb` packages for amd64 and arm64 to the `sarak.sh` Debian registry, distribution `trixie`, component `main`, and attach them to the release.
+
+```text
+Types: deb
+URIs: https://sarak.sh/api/packages/mikluko/debian
+Suites: trixie
+Components: main
+Signed-By: /etc/apt/keyrings/sarak.asc
+```
+
+The key is at `https://sarak.sh/api/packages/mikluko/debian/repository.key`.
+
 ### Binary
 
 ```bash
-go install github.com/mikluko/jmap-mcp@latest
+go install sarak.sh/mikluko/jmap-mcp@latest
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/mikluko/jmap-mcp.git
+git clone https://sarak.sh/mikluko/jmap-mcp.git
 cd jmap-mcp
 make install
 ```

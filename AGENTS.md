@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-JMAP MCP server — exposes JMAP (JSON Meta Application Protocol, RFC 8620/8621) email and Sieve script (RFC 9425) operations as MCP (Model Context Protocol) tools. Built with the official Go MCP SDK (`github.com/modelcontextprotocol/go-sdk`) and the `github.com/mikluko/jmap` library for typed JMAP protocol support.
+JMAP MCP server — exposes JMAP (JSON Meta Application Protocol, RFC 8620/8621) email and Sieve script (RFC 9425) operations as MCP (Model Context Protocol) tools. Built with the official Go MCP SDK (`github.com/modelcontextprotocol/go-sdk`) and the `sarak.sh/mikluko/jmap` library for typed JMAP protocol support.
 
 ## Build & Test
 
@@ -45,7 +45,7 @@ internal/
     tools_sieve.go              # sieve_get, sieve_set, sieve_validate
 ```
 
-External dependency `github.com/mikluko/jmap` provides:
+External dependency `sarak.sh/mikluko/jmap` provides:
 - `jmap` — core JMAP client, session, request/response, type registry, `Patch` type
 - `jmap/mail` — mail capability URI, `Address` type
 - `jmap/mail/mailbox` — `Mailbox`, `Get`/`GetResponse`, `Set`/`SetResponse`, role constants (`RoleTrash`, `RoleDrafts`, `RoleSent`, etc.)

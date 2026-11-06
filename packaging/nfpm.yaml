@@ -1,0 +1,14 @@
+name: jmap-mcp
+arch: ${GOARCH}
+platform: linux
+version: ${VERSION}
+section: mail
+priority: optional
+maintainer: Mikhail Lukianchenko <ml@akabos.com>
+description: MCP server exposing JMAP email and Sieve script operations as tools
+homepage: https://sarak.sh/mikluko/jmap-mcp
+contents:
+  - src: dist/jmap-mcp
+    dst: /usr/bin/jmap-mcp
+    file_info:
+      mode: 0755

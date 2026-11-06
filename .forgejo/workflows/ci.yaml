@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go build -o "$RUNNER_TEMP/jmap-mcp" .
+      - run: go test -race ./...
+
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: https://github.com/azure/setup-helm@v5
+        with:
+          version: v4.3.1
+      - run: helm lint --strict charts/jmap-mcp
+
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      # The changelog is compared against the tags, which a shallow checkout lacks.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: https://sarak.sh/actions/changelog@v1

@@ -6,10 +6,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mikluko/jmap"
-	"github.com/mikluko/jmap/sieve"
-	"github.com/mikluko/jmap/sieve/sievescript"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"sarak.sh/mikluko/jmap"
+	"sarak.sh/mikluko/jmap/sieve"
+	"sarak.sh/mikluko/jmap/sieve/sievescript"
 )
 
 // sieveAccountID returns the primary account ID for the Sieve capability,
@@ -125,10 +125,10 @@ func (s *Server) handleSieveGet(ctx context.Context, _ *mcp.CallToolRequest, in 
 // --- sieve_set ---
 
 type SieveSetInput struct {
-	Name     string `json:"name,omitempty" jsonschema:"Name for the Sieve script (required for create)"`
-	Content  string `json:"content,omitempty" jsonschema:"Sieve script source code (required for create, optional for update)"`
-	ID       string `json:"id,omitempty" jsonschema:"ID of existing script to update"`
-	Activate *bool  `json:"activate,omitempty" jsonschema:"Activate script on successful create/update"`
+	Name     string   `json:"name,omitempty" jsonschema:"Name for the Sieve script (required for create)"`
+	Content  string   `json:"content,omitempty" jsonschema:"Sieve script source code (required for create, optional for update)"`
+	ID       string   `json:"id,omitempty" jsonschema:"ID of existing script to update"`
+	Activate *bool    `json:"activate,omitempty" jsonschema:"Activate script on successful create/update"`
 	Destroy  []string `json:"destroy,omitempty" jsonschema:"Script IDs to destroy"`
 }
 

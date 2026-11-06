@@ -9,8 +9,8 @@ keywords:
   - jmap
   - email
   - sieve
-home: https://github.com/mikluko/jmap-mcp
+home: https://sarak.sh/mikluko/jmap-mcp
 sources:
-  - https://github.com/mikluko/jmap-mcp
+  - https://sarak.sh/mikluko/jmap-mcp
 maintainers:
   - name: mikluko

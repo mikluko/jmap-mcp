@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mikluko/jmap"
-	"github.com/mikluko/jmap/mail"
-	"github.com/mikluko/jmap/mail/mailbox"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"sarak.sh/mikluko/jmap"
+	"sarak.sh/mikluko/jmap/mail"
+	"sarak.sh/mikluko/jmap/mail/mailbox"
 )
 
 // --- mailbox_get ---
@@ -88,7 +88,7 @@ type MailboxSetUpdate struct {
 type MailboxSetInput struct {
 	Create                map[string]MailboxSetCreate `json:"create,omitempty" jsonschema:"Mailboxes to create keyed by creation ID"`
 	Update                map[string]MailboxSetUpdate `json:"update,omitempty" jsonschema:"Mailboxes to update keyed by mailbox ID"`
-	Destroy               []string                   `json:"destroy,omitempty" jsonschema:"Mailbox IDs to destroy"`
+	Destroy               []string                    `json:"destroy,omitempty" jsonschema:"Mailbox IDs to destroy"`
 	OnDestroyRemoveEmails bool                        `json:"on_destroy_remove_emails,omitempty" jsonschema:"Also destroy emails that are only in destroyed mailboxes"`
 }
 

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mikluko/jmap"
+	"sarak.sh/mikluko/jmap"
 )
 
 // attachmentURLTTL bounds the life of a signed attachment URL. Deliberately

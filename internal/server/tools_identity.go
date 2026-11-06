@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mikluko/jmap"
-	"github.com/mikluko/jmap/mail"
-	"github.com/mikluko/jmap/mail/identity"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"sarak.sh/mikluko/jmap"
+	"sarak.sh/mikluko/jmap/mail"
+	"sarak.sh/mikluko/jmap/mail/identity"
 )
 
 // --- identity_get ---

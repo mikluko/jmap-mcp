@@ -2,7 +2,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/mikluko/jmap-mcp
+  repository: sarak.sh/mikluko/jmap-mcp
   pullPolicy: IfNotPresent
   tag: "" # Overrides the image tag (default is the chart appVersion)
 

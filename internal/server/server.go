@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mikluko/jmap"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"sarak.sh/mikluko/jmap"
 
 	// Register JMAP method response types for deserialization.
-	_ "github.com/mikluko/jmap/mail/email"
-	_ "github.com/mikluko/jmap/mail/emailsubmission"
-	_ "github.com/mikluko/jmap/mail/identity"
-	_ "github.com/mikluko/jmap/mail/mailbox"
-	_ "github.com/mikluko/jmap/sieve/sievescript"
+	_ "sarak.sh/mikluko/jmap/mail/email"
+	_ "sarak.sh/mikluko/jmap/mail/emailsubmission"
+	_ "sarak.sh/mikluko/jmap/mail/identity"
+	_ "sarak.sh/mikluko/jmap/mail/mailbox"
+	_ "sarak.sh/mikluko/jmap/sieve/sievescript"
 )
 
 // Option configures optional Server behavior.

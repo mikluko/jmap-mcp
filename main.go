@@ -9,8 +9,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/mikluko/jmap-mcp/internal/config"
-	"github.com/mikluko/jmap-mcp/internal/server"
+	"sarak.sh/mikluko/jmap-mcp/internal/config"
+	"sarak.sh/mikluko/jmap-mcp/internal/server"
 )
 
 var version = "0.0.0"
