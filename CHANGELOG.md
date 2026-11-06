@@ -7,6 +7,12 @@ Versions up to 0.11.2 have no entries here.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-11-06
+
+### Fixed
+
+- The image runs on arm64: it is published for linux/amd64 and linux/arm64.
+
 ## [0.12.0] - 2026-11-06
 
 ### Added
@@ -23,5 +29,6 @@ Versions up to 0.11.2 have no entries here.
 
 - **Breaking:** the server is no longer published to the MCP Registry as `io.github.mikluko/jmap-mcp`.
 
-[Unreleased]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.12.0...HEAD
+[Unreleased]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.12.1...HEAD
+[0.12.1]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.12.0...v0.12.1
 [0.12.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.11.2...v0.12.0
