@@ -1,6 +1,6 @@
 module sarak.sh/mikluko/jmap-mcp
 
-go 1.25.0
+go 1.27.3
 
 require (
 	github.com/k3a/html2text v1.3.0
