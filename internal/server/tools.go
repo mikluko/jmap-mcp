@@ -22,7 +22,7 @@ const serverInstructions = `JMAP MCP Server — email and Sieve script managemen
 
 **Reading email**: call mailbox_get to discover mailbox IDs and roles, then email_query with filters to get matching email IDs, then email_get with those IDs to retrieve full content.
 
-**Sending email**: call email_create to compose a draft (saved in Drafts), then email_submission_set with the draft ID to submit for delivery (automatically moves from Drafts to Sent).
+**Sending email**: call email_create to compose a draft (saved in Drafts), then email_submission_set with the draft ID to submit for delivery (automatically moves from Drafts to Sent). To answer an email, pass its ID to email_create as in_reply_to, so the answer joins its thread.
 
 **Managing email**: use email_move to move between mailboxes, email_flag to mark as read/flagged/answered, email_delete to trash or permanently destroy.
 

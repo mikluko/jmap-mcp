@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -309,15 +310,69 @@ type EmailCreateInput struct {
 	To         []string `json:"to,omitempty" jsonschema:"Recipient email addresses"`
 	CC         []string `json:"cc,omitempty" jsonschema:"CC email addresses"`
 	BCC        []string `json:"bcc,omitempty" jsonschema:"BCC email addresses"`
-	Subject    string   `json:"subject" jsonschema:"Email subject"`
+	Subject    string   `json:"subject,omitempty" jsonschema:"Email subject; required unless in_reply_to is set"`
 	Body       string   `json:"body" jsonschema:"Plain text email body"`
 	IdentityID string   `json:"identity_id,omitempty" jsonschema:"Sender identity ID, whose name and address go into From (the first identity if omitted)"`
+	InReplyTo  string   `json:"in_reply_to,omitempty" jsonschema:"ID of the email this one answers: the draft joins its thread, and an empty subject or to is taken from it"`
 }
 
 var emailCreateTool = &mcp.Tool{
 	Name:        "email_create",
-	Description: "Create a new email draft in the Drafts mailbox, From the sender identity. Returns the draft ID, which can be passed to email_submission_set to send it; pass it the same identity_id.",
+	Description: "Create a new email draft in the Drafts mailbox, From the sender identity. To answer an email, pass its ID as in_reply_to. Returns the draft ID, which can be passed to email_submission_set to send it; pass it the same identity_id.",
 	Annotations: mutatingAnnotations,
+}
+
+// asReply threads draft under orig, and fills an empty subject with orig's,
+// prefixed "Re: " unless it already is, and empty recipients with orig's
+// Reply-To, else its From.
+func asReply(draft, orig *email.Email) {
+	draft.InReplyTo = orig.MessageID
+	refs := orig.References
+	if len(refs) == 0 {
+		refs = orig.InReplyTo
+	}
+	draft.References = append(slices.Clone(refs), orig.MessageID...)
+
+	if draft.Subject == "" {
+		draft.Subject = orig.Subject
+		if !strings.HasPrefix(strings.ToLower(orig.Subject), "re:") {
+			draft.Subject = "Re: " + orig.Subject
+		}
+	}
+	if len(draft.To) == 0 {
+		draft.To = orig.ReplyTo
+		if len(draft.To) == 0 {
+			draft.To = orig.From
+		}
+	}
+}
+
+// original returns the headers of the email id that asReply needs.
+func (s *Server) original(ctx context.Context, client *jmap.Client, accountID, id jmap.ID) (*email.Email, error) {
+	req := &jmap.Request{Context: ctx}
+	req.Invoke(&email.Get{
+		Account:    accountID,
+		IDs:        []jmap.ID{id},
+		Properties: []string{"messageId", "inReplyTo", "references", "from", "replyTo", "subject"},
+	})
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Responses) == 0 {
+		return nil, fmt.Errorf("empty response for Email/get")
+	}
+	switch args := resp.Responses[0].Args.(type) {
+	case *email.GetResponse:
+		if len(args.List) == 0 {
+			return nil, fmt.Errorf("no email %s", id)
+		}
+		return args.List[0], nil
+	case *jmap.MethodError:
+		return nil, args
+	default:
+		return nil, fmt.Errorf("unexpected email response type: %T", args)
+	}
 }
 
 // senderIdentity returns the identity with the given id, or the first one when
@@ -402,6 +457,16 @@ func (s *Server) handleEmailCreate(ctx context.Context, _ *mcp.CallToolRequest, 
 		return errorResult(err), nil, nil
 	}
 	draft := newDraft(in, draftsID, sender)
+	if in.InReplyTo != "" {
+		orig, err := s.original(ctx, client, accountID, jmap.ID(in.InReplyTo))
+		if err != nil {
+			return errorResult(err), nil, nil
+		}
+		asReply(draft, orig)
+	}
+	if draft.Subject == "" {
+		return errorResult(fmt.Errorf("subject is required unless in_reply_to is set")), nil, nil
+	}
 
 	req := &jmap.Request{Context: ctx}
 	req.Invoke(&email.Set{

@@ -22,7 +22,7 @@ Tools map closely to JMAP methods. Email mutation tools provide structured conve
 |----------------|--------------|----------------------------------------------------------------|
 | `email_query`  | `Email/query`| Search emails with filters, returns IDs and total count        |
 | `email_get`    | `Email/get`  | Get full content of emails by ID                               |
-| `email_create` | `Email/set`  | Create a new email draft in the Drafts mailbox                 |
+| `email_create` | `Email/set`  | Create a new email draft in the Drafts mailbox, or an answer   |
 | `email_move`   | `Email/set`  | Move emails to a different mailbox                             |
 | `email_flag`   | `Email/set`  | Set or remove flags (seen, flagged, answered, draft)           |
 | `email_delete` | `Email/set`  | Delete emails (move to Trash or permanently destroy)           |
