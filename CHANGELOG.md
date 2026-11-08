@@ -7,6 +7,16 @@ Versions up to 0.11.2 have no entries here.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-08
+
+### Added
+
+- `email_create` takes `identity_id`, the sender identity whose name and address go into From.
+
+### Fixed
+
+- Drafts from `email_create` carry a From header: the first sender identity's, unless `identity_id` names another.
+
 ## [0.12.1] - 2026-11-06
 
 ### Fixed
@@ -29,6 +39,7 @@ Versions up to 0.11.2 have no entries here.
 
 - **Breaking:** the server is no longer published to the MCP Registry as `io.github.mikluko/jmap-mcp`.
 
-[Unreleased]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.12.1...HEAD
+[Unreleased]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.13.0...HEAD
+[0.13.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.12.1...v0.13.0
 [0.12.1]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.12.0...v0.12.1
 [0.12.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.11.2...v0.12.0

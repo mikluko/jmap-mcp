@@ -11,6 +11,7 @@ import (
 	"sarak.sh/mikluko/jmap"
 	"sarak.sh/mikluko/jmap/mail"
 	"sarak.sh/mikluko/jmap/mail/email"
+	"sarak.sh/mikluko/jmap/mail/identity"
 	"sarak.sh/mikluko/jmap/mail/mailbox"
 )
 
@@ -305,17 +306,75 @@ func (s *Server) handleEmailGet(ctx context.Context, _ *mcp.CallToolRequest, in 
 // --- email_create ---
 
 type EmailCreateInput struct {
-	To      []string `json:"to,omitempty" jsonschema:"Recipient email addresses"`
-	CC      []string `json:"cc,omitempty" jsonschema:"CC email addresses"`
-	BCC     []string `json:"bcc,omitempty" jsonschema:"BCC email addresses"`
-	Subject string   `json:"subject" jsonschema:"Email subject"`
-	Body    string   `json:"body" jsonschema:"Plain text email body"`
+	To         []string `json:"to,omitempty" jsonschema:"Recipient email addresses"`
+	CC         []string `json:"cc,omitempty" jsonschema:"CC email addresses"`
+	BCC        []string `json:"bcc,omitempty" jsonschema:"BCC email addresses"`
+	Subject    string   `json:"subject" jsonschema:"Email subject"`
+	Body       string   `json:"body" jsonschema:"Plain text email body"`
+	IdentityID string   `json:"identity_id,omitempty" jsonschema:"Sender identity ID, whose name and address go into From (the first identity if omitted)"`
 }
 
 var emailCreateTool = &mcp.Tool{
 	Name:        "email_create",
-	Description: "Create a new email draft in the Drafts mailbox. Returns the draft ID, which can be passed to email_submission_set to send it.",
+	Description: "Create a new email draft in the Drafts mailbox, From the sender identity. Returns the draft ID, which can be passed to email_submission_set to send it; pass it the same identity_id.",
 	Annotations: mutatingAnnotations,
+}
+
+// senderIdentity returns the identity with the given id, or the first one when
+// id is empty.
+func senderIdentity(list []*identity.Identity, id jmap.ID) (*identity.Identity, error) {
+	if len(list) == 0 {
+		return nil, fmt.Errorf("no sender identities available")
+	}
+	if id == "" {
+		return list[0], nil
+	}
+	for _, ident := range list {
+		if ident.ID == id {
+			return ident, nil
+		}
+	}
+	return nil, fmt.Errorf("no sender identity %s", id)
+}
+
+// newDraft returns the draft for in, in the Drafts mailbox and From sender.
+func newDraft(in EmailCreateInput, draftsID jmap.ID, sender *identity.Identity) *email.Email {
+	return &email.Email{
+		MailboxIDs: map[jmap.ID]bool{draftsID: true},
+		Keywords:   map[string]bool{"$draft": true},
+		From:       []*mail.Address{{Name: sender.Name, Email: sender.Email}},
+		To:         toMailAddresses(in.To),
+		CC:         toMailAddresses(in.CC),
+		BCC:        toMailAddresses(in.BCC),
+		Subject:    in.Subject,
+		BodyValues: map[string]*email.BodyValue{
+			"body": {Value: in.Body},
+		},
+		TextBody: []*email.BodyPart{
+			{PartID: "body", Type: "text/plain"},
+		},
+	}
+}
+
+// identities returns the account's sender identities.
+func (s *Server) identities(ctx context.Context, client *jmap.Client, accountID jmap.ID) ([]*identity.Identity, error) {
+	req := &jmap.Request{Context: ctx}
+	req.Invoke(&identity.Get{Account: accountID})
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Responses) == 0 {
+		return nil, fmt.Errorf("empty response for Identity/get")
+	}
+	switch args := resp.Responses[0].Args.(type) {
+	case *identity.GetResponse:
+		return args.List, nil
+	case *jmap.MethodError:
+		return nil, args
+	default:
+		return nil, fmt.Errorf("unexpected identity response type: %T", args)
+	}
 }
 
 func (s *Server) handleEmailCreate(ctx context.Context, _ *mcp.CallToolRequest, in EmailCreateInput) (*mcp.CallToolResult, any, error) {
@@ -334,20 +393,15 @@ func (s *Server) handleEmailCreate(ctx context.Context, _ *mcp.CallToolRequest, 
 		return errorResult(err), nil, nil
 	}
 
-	draft := &email.Email{
-		MailboxIDs: map[jmap.ID]bool{draftsID: true},
-		Keywords:   map[string]bool{"$draft": true},
-		To:         toMailAddresses(in.To),
-		CC:         toMailAddresses(in.CC),
-		BCC:        toMailAddresses(in.BCC),
-		Subject:    in.Subject,
-		BodyValues: map[string]*email.BodyValue{
-			"body": {Value: in.Body},
-		},
-		TextBody: []*email.BodyPart{
-			{PartID: "body", Type: "text/plain"},
-		},
+	idents, err := s.identities(ctx, client, accountID)
+	if err != nil {
+		return errorResult(err), nil, nil
 	}
+	sender, err := senderIdentity(idents, jmap.ID(in.IdentityID))
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	draft := newDraft(in, draftsID, sender)
 
 	req := &jmap.Request{Context: ctx}
 	req.Invoke(&email.Set{
