@@ -124,3 +124,32 @@ func TestNewDraftFrom(t *testing.T) {
 		t.Fatalf("draft is not in the Drafts mailbox: %v", draft.MailboxIDs)
 	}
 }
+
+func TestSigned(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, sig, want string
+	}{
+		{"no signature", "Hello.\n", "", "Hello.\n"},
+		{"separator added", "Hello.", "— Mayor", "Hello.\n\n-- \n— Mayor"},
+		{"trailing newlines folded", "Hello.\n\n\n", "— Mayor", "Hello.\n\n-- \n— Mayor"},
+		{"separator kept", "Hello.", "-- \n— Mayor", "Hello.\n\n-- \n— Mayor"},
+		{"already signed", "Hello.\n\n-- \n— Mayor\n", "— Mayor", "Hello.\n\n-- \n— Mayor\n"},
+		{"empty body", "", "— Mayor", "-- \n— Mayor"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := signed(tc.body, tc.sig); got != tc.want {
+				t.Fatalf("signed(%q, %q) = %q, want %q", tc.body, tc.sig, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNewDraftSignature(t *testing.T) {
+	sender := &identity.Identity{ID: "b", Name: "Mayor of Saraksh", Email: "saraksh@cities.sarak.sh", TextSignature: "— Mayor, city Saraksh (Gas City)"}
+	draft := newDraft(EmailCreateInput{Subject: "s", Body: "Hello."}, jmap.ID("drafts"), sender)
+
+	want := "Hello.\n\n-- \n— Mayor, city Saraksh (Gas City)"
+	if got := draft.BodyValues["body"].Value; got != want {
+		t.Fatalf("body is %q, want %q", got, want)
+	}
+}

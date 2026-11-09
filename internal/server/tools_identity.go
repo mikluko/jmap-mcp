@@ -19,8 +19,26 @@ type IdentityGetInput struct {
 
 var identityGetTool = &mcp.Tool{
 	Name:        "identity_get",
-	Description: "Get sender identities — the email addresses the user may send from. Useful before email_submission_set to choose or verify the sender identity.",
+	Description: "Get sender identities — the email addresses the user may send from, with the text and HTML signatures email_create signs with. Useful before email_create to choose or verify the sender identity.",
 	Annotations: readOnlyAnnotations,
+}
+
+// formatIdentity renders ident as a line, followed by a quoted line per
+// signature it has.
+func formatIdentity(ident *identity.Identity) string {
+	name := ident.Name
+	if name == "" {
+		name = "(unnamed)"
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%s <%s> [id: %s]\n", name, ident.Email, ident.ID)
+	if ident.TextSignature != "" {
+		fmt.Fprintf(&sb, "  textSignature: %q\n", ident.TextSignature)
+	}
+	if ident.HTMLSignature != "" {
+		fmt.Fprintf(&sb, "  htmlSignature: %q\n", ident.HTMLSignature)
+	}
+	return sb.String()
 }
 
 func (s *Server) handleIdentityGet(ctx context.Context, _ *mcp.CallToolRequest, in IdentityGetInput) (*mcp.CallToolResult, any, error) {
@@ -58,11 +76,7 @@ func (s *Server) handleIdentityGet(ctx context.Context, _ *mcp.CallToolRequest, 
 		}
 		var sb strings.Builder
 		for _, id := range args.List {
-			name := id.Name
-			if name == "" {
-				name = "(unnamed)"
-			}
-			fmt.Fprintf(&sb, "%s <%s> [id: %s]\n", name, id.Email, id.ID)
+			sb.WriteString(formatIdentity(id))
 		}
 		if len(args.List) == 0 {
 			sb.WriteString("No sender identities found.\n")

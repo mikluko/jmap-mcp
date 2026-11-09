@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"sarak.sh/mikluko/jmap"
 	"sarak.sh/mikluko/jmap/mail"
+	"sarak.sh/mikluko/jmap/mail/email"
 	"sarak.sh/mikluko/jmap/mail/emailsubmission"
 	"sarak.sh/mikluko/jmap/mail/identity"
 	"sarak.sh/mikluko/jmap/mail/mailbox"
@@ -16,13 +18,98 @@ import (
 
 type EmailSubmissionSetInput struct {
 	EmailID    string `json:"email_id" jsonschema:"ID of the email to submit for delivery"`
-	IdentityID string `json:"identity_id,omitempty" jsonschema:"Sender identity ID (auto-detected if omitted)"`
+	IdentityID string `json:"identity_id,omitempty" jsonschema:"Sender identity ID (the one whose address is the draft's From if omitted)"`
 }
 
 var emailSubmissionSetTool = &mcp.Tool{
 	Name:        "email_submission_set",
-	Description: "Submit a draft email for delivery. Automatically moves it from Drafts to Sent and removes the draft flag. Create the draft first with email_create. Identity is auto-detected if omitted.",
+	Description: "Submit a draft email for delivery. Automatically moves it from Drafts to Sent and removes the draft flag. Create the draft first with email_create; a draft without From is refused. Identity defaults to the one whose address is the draft's From.",
 	Annotations: mutatingAnnotations,
+}
+
+// submissionIdentity returns the identity to submit a draft with: the one named
+// by id, else the one whose address is the draft's first From, else the first.
+// A draft without From is an error: servers send it without a From header.
+func submissionIdentity(list []*identity.Identity, id jmap.ID, from []*mail.Address) (*identity.Identity, error) {
+	if len(from) == 0 {
+		return nil, fmt.Errorf("draft has no From; create it with email_create")
+	}
+	if id == "" {
+		for _, ident := range list {
+			if strings.EqualFold(ident.Email, from[0].Email) {
+				return ident, nil
+			}
+		}
+	}
+	return senderIdentity(list, id)
+}
+
+type submissionDiscovery struct {
+	draftsID, sentID jmap.ID
+	identities       []*identity.Identity
+	from             []*mail.Address
+}
+
+// discoverSubmission fetches, in one request, the Drafts and Sent mailboxes,
+// the sender identities and the From of the draft emailID.
+func (s *Server) discoverSubmission(ctx context.Context, client *jmap.Client, accountID, emailID jmap.ID) (*submissionDiscovery, error) {
+	req := &jmap.Request{Context: ctx}
+	req.Invoke(&mailbox.Get{Account: accountID})
+	req.Invoke(&identity.Get{Account: accountID})
+	req.Invoke(&email.Get{Account: accountID, IDs: []jmap.ID{emailID}, Properties: []string{"from"}})
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Responses) < 3 {
+		return nil, fmt.Errorf("expected 3 discovery responses, got %d", len(resp.Responses))
+	}
+
+	d := &submissionDiscovery{}
+	switch args := resp.Responses[0].Args.(type) {
+	case *mailbox.GetResponse:
+		for _, mb := range args.List {
+			switch mb.Role {
+			case mailbox.RoleDrafts:
+				d.draftsID = mb.ID
+			case mailbox.RoleSent:
+				d.sentID = mb.ID
+			}
+		}
+	case *jmap.MethodError:
+		return nil, args
+	default:
+		return nil, fmt.Errorf("unexpected mailbox response type: %T", args)
+	}
+	if d.draftsID == "" {
+		return nil, fmt.Errorf("no Drafts mailbox found")
+	}
+	if d.sentID == "" {
+		return nil, fmt.Errorf("no Sent mailbox found")
+	}
+
+	switch args := resp.Responses[1].Args.(type) {
+	case *identity.GetResponse:
+		d.identities = args.List
+	case *jmap.MethodError:
+		return nil, args
+	default:
+		return nil, fmt.Errorf("unexpected identity response type: %T", args)
+	}
+
+	switch args := resp.Responses[2].Args.(type) {
+	case *email.GetResponse:
+		if len(args.List) == 0 {
+			return nil, fmt.Errorf("no email %s", emailID)
+		}
+		d.from = args.List[0].From
+	case *jmap.MethodError:
+		return nil, args
+	default:
+		return nil, fmt.Errorf("unexpected email response type: %T", args)
+	}
+	return d, nil
 }
 
 func (s *Server) handleEmailSubmissionSet(ctx context.Context, _ *mcp.CallToolRequest, in EmailSubmissionSetInput) (*mcp.CallToolResult, any, error) {
@@ -40,60 +127,16 @@ func (s *Server) handleEmailSubmissionSet(ctx context.Context, _ *mcp.CallToolRe
 		return errorResult(fmt.Errorf("no primary mail account")), nil, nil
 	}
 
-	// Discovery request: fetch mailboxes (for Drafts + Sent) and identities.
-	discoverReq := &jmap.Request{Context: ctx}
-	discoverReq.Invoke(&mailbox.Get{Account: accountID})
-	discoverReq.Invoke(&identity.Get{Account: accountID})
-
-	discoverResp, err := client.Do(discoverReq)
+	d, err := s.discoverSubmission(ctx, client, accountID, jmap.ID(in.EmailID))
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
-
-	if len(discoverResp.Responses) < 2 {
-		return errorResult(fmt.Errorf("expected 2 discovery responses, got %d", len(discoverResp.Responses))), nil, nil
+	draftsID, sentID := d.draftsID, d.sentID
+	sender, err := submissionIdentity(d.identities, jmap.ID(in.IdentityID), d.from)
+	if err != nil {
+		return errorResult(err), nil, nil
 	}
-
-	// Find Drafts and Sent mailbox IDs.
-	var draftsID, sentID jmap.ID
-	switch args := discoverResp.Responses[0].Args.(type) {
-	case *mailbox.GetResponse:
-		for _, mb := range args.List {
-			switch mb.Role {
-			case mailbox.RoleDrafts:
-				draftsID = mb.ID
-			case mailbox.RoleSent:
-				sentID = mb.ID
-			}
-		}
-	case *jmap.MethodError:
-		return errorResult(args), nil, nil
-	default:
-		return errorResult(fmt.Errorf("unexpected mailbox response type: %T", args)), nil, nil
-	}
-
-	if draftsID == "" {
-		return errorResult(fmt.Errorf("no Drafts mailbox found")), nil, nil
-	}
-	if sentID == "" {
-		return errorResult(fmt.Errorf("no Sent mailbox found")), nil, nil
-	}
-
-	// Resolve sender identity.
-	identityID := jmap.ID(in.IdentityID)
-	switch args := discoverResp.Responses[1].Args.(type) {
-	case *identity.GetResponse:
-		if identityID == "" {
-			if len(args.List) == 0 {
-				return errorResult(fmt.Errorf("no sender identities available")), nil, nil
-			}
-			identityID = args.List[0].ID
-		}
-	case *jmap.MethodError:
-		return errorResult(args), nil, nil
-	default:
-		return errorResult(fmt.Errorf("unexpected identity response type: %T", args)), nil, nil
-	}
+	identityID := sender.ID
 
 	// Submit the email for delivery.
 	submitReq := &jmap.Request{Context: ctx}

@@ -32,7 +32,7 @@ Tools map closely to JMAP methods. Email mutation tools provide structured conve
 
 | Tool           | JMAP Method    | Description                                       |
 |----------------|----------------|---------------------------------------------------|
-| `identity_get` | `Identity/get` | List sender identities (email addresses)          |
+| `identity_get` | `Identity/get` | List sender identities (addresses and signatures) |
 
 ### Submission (feature-gated)
 

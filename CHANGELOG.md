@@ -7,6 +7,21 @@ Versions up to 0.11.2 have no entries here.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-09
+
+### Added
+
+- `identity_get` shows each identity's text and HTML signatures.
+
+### Changed
+
+- `email_create` appends the sender identity's text signature to the body, below a `-- ` separator, unless the body already ends with it.
+- `email_submission_set` without `identity_id` submits with the identity whose address is the draft's From.
+
+### Fixed
+
+- `email_submission_set` refuses a draft without From, which the server would send with no From header.
+
 ## [0.14.0] - 2026-11-08
 
 ### Added
@@ -49,7 +64,8 @@ Versions up to 0.11.2 have no entries here.
 
 - **Breaking:** the server is no longer published to the MCP Registry as `io.github.mikluko/jmap-mcp`.
 
-[Unreleased]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.14.0...HEAD
+[Unreleased]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.15.0...HEAD
+[0.15.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.14.0...v0.15.0
 [0.14.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.13.0...v0.14.0
 [0.13.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.12.1...v0.13.0
 [0.12.1]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.12.0...v0.12.1

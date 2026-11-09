@@ -311,14 +311,14 @@ type EmailCreateInput struct {
 	CC         []string `json:"cc,omitempty" jsonschema:"CC email addresses"`
 	BCC        []string `json:"bcc,omitempty" jsonschema:"BCC email addresses"`
 	Subject    string   `json:"subject,omitempty" jsonschema:"Email subject; required unless in_reply_to is set"`
-	Body       string   `json:"body" jsonschema:"Plain text email body"`
-	IdentityID string   `json:"identity_id,omitempty" jsonschema:"Sender identity ID, whose name and address go into From (the first identity if omitted)"`
+	Body       string   `json:"body" jsonschema:"Plain text email body, without a signature: the sender identity's text signature is appended"`
+	IdentityID string   `json:"identity_id,omitempty" jsonschema:"Sender identity ID, whose name and address go into From and whose signature ends the body (the first identity if omitted)"`
 	InReplyTo  string   `json:"in_reply_to,omitempty" jsonschema:"ID of the email this one answers: the draft joins its thread, and an empty subject or to is taken from it"`
 }
 
 var emailCreateTool = &mcp.Tool{
 	Name:        "email_create",
-	Description: "Create a new email draft in the Drafts mailbox, From the sender identity. To answer an email, pass its ID as in_reply_to. Returns the draft ID, which can be passed to email_submission_set to send it; pass it the same identity_id.",
+	Description: "Create a new email draft in the Drafts mailbox, From the sender identity and signed with its text signature. To answer an email, pass its ID as in_reply_to. Returns the draft ID, which can be passed to email_submission_set to send it.",
 	Annotations: mutatingAnnotations,
 }
 
@@ -392,7 +392,29 @@ func senderIdentity(list []*identity.Identity, id jmap.ID) (*identity.Identity, 
 	return nil, fmt.Errorf("no sender identity %s", id)
 }
 
-// newDraft returns the draft for in, in the Drafts mailbox and From sender.
+// signatureSeparator is the RFC 3676 signature delimiter line.
+const signatureSeparator = "-- \n"
+
+// signed returns body with sig appended below the signature separator; sig
+// carrying its own separator keeps it, and a body already ending in sig is
+// returned as is.
+func signed(body, sig string) string {
+	sig = strings.TrimRight(sig, "\n")
+	if sig == "" || strings.HasSuffix(strings.TrimRight(body, "\n"), sig) {
+		return body
+	}
+	if !strings.HasPrefix(sig, signatureSeparator) {
+		sig = signatureSeparator + sig
+	}
+	body = strings.TrimRight(body, "\n")
+	if body == "" {
+		return sig
+	}
+	return body + "\n\n" + sig
+}
+
+// newDraft returns the draft for in, in the Drafts mailbox, From sender and
+// signed with its text signature.
 func newDraft(in EmailCreateInput, draftsID jmap.ID, sender *identity.Identity) *email.Email {
 	return &email.Email{
 		MailboxIDs: map[jmap.ID]bool{draftsID: true},
@@ -403,7 +425,7 @@ func newDraft(in EmailCreateInput, draftsID jmap.ID, sender *identity.Identity) 
 		BCC:        toMailAddresses(in.BCC),
 		Subject:    in.Subject,
 		BodyValues: map[string]*email.BodyValue{
-			"body": {Value: in.Body},
+			"body": {Value: signed(in.Body, sender.TextSignature)},
 		},
 		TextBody: []*email.BodyPart{
 			{PartID: "body", Type: "text/plain"},
