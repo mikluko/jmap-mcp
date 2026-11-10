@@ -7,6 +7,12 @@ Versions up to 0.11.2 have no entries here.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-10
+
+### Fixed
+
+- `email_get` keeps the quotes of an interleaved HTML reply, as `> ` lines (`> > ` when nested), so answers keep their questions. Only the quoted history after the last new text, and its "On ... wrote:" line, is dropped, as for text bodies.
+
 ## [0.15.0] - 2026-11-09
 
 ### Added
