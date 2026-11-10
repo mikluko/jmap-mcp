@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/k3a/html2text"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"sarak.sh/mikluko/jmap"
 	"sarak.sh/mikluko/jmap/mail"
@@ -795,7 +794,7 @@ func extractBody(e *email.Email) string {
 	}
 	for _, part := range e.HTMLBody {
 		if bv, ok := e.BodyValues[part.PartID]; ok {
-			return PrepareBody(html2text.HTML2Text(StripBlockquotes(bv.Value)), 0)
+			return PrepareBody(HTMLToText(bv.Value), 0)
 		}
 	}
 	return ""

@@ -7,6 +7,12 @@ Versions up to 0.11.2 have no entries here.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-10
+
+### Fixed
+
+- `email_get` keeps the quotes of an interleaved HTML reply, as `> ` lines (`> > ` when nested), so answers keep their questions. Only the quoted history after the last new text, and its "On ... wrote:" line, is dropped, as for text bodies.
+
 ## [0.15.0] - 2026-11-09
 
 ### Added
@@ -64,7 +70,8 @@ Versions up to 0.11.2 have no entries here.
 
 - **Breaking:** the server is no longer published to the MCP Registry as `io.github.mikluko/jmap-mcp`.
 
-[Unreleased]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.15.0...HEAD
+[Unreleased]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.15.1...HEAD
+[0.15.1]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.15.0...v0.15.1
 [0.15.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.14.0...v0.15.0
 [0.14.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.13.0...v0.14.0
 [0.13.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.12.1...v0.13.0
