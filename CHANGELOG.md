@@ -7,6 +7,8 @@ Versions up to 0.11.2 have no entries here.
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-11-13
+
 ### Fixed
 
 - The server names its module version in `serverInfo` in a build made with `go install` or `go tool`, where it named `0.0.0`. A build from a checkout names its pseudo-version, or `(devel)` where Go records none.
@@ -74,7 +76,8 @@ Versions up to 0.11.2 have no entries here.
 
 - **Breaking:** the server is no longer published to the MCP Registry as `io.github.mikluko/jmap-mcp`.
 
-[Unreleased]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.15.1...HEAD
+[Unreleased]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.15.2...HEAD
+[0.15.2]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.15.1...v0.15.2
 [0.15.1]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.15.0...v0.15.1
 [0.15.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.14.0...v0.15.0
 [0.14.0]: https://sarak.sh/mikluko/jmap-mcp/compare/v0.13.0...v0.14.0
