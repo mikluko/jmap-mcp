@@ -7,6 +7,10 @@ Versions up to 0.11.2 have no entries here.
 
 ## [Unreleased]
 
+### Fixed
+
+- The server names its module version in `serverInfo` in a build made with `go install` or `go tool`, where it named `0.0.0`. A build from a checkout names its pseudo-version, or `(devel)` where Go records none.
+
 ## [0.15.1] - 2026-11-10
 
 ### Fixed

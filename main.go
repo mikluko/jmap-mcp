@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime/debug"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -13,7 +15,19 @@ import (
 	"sarak.sh/mikluko/jmap-mcp/internal/server"
 )
 
-var version = "0.0.0"
+const unlinked = "0.0.0"
+
+var version = unlinked
+
+// reportedVersion returns linked when a release build set it, and otherwise
+// the main module's version from info, without its leading "v".
+// Where info records no module version it returns linked.
+func reportedVersion(linked string, info *debug.BuildInfo) string {
+	if linked != unlinked || info == nil || info.Main.Version == "" {
+		return linked
+	}
+	return strings.TrimPrefix(info.Main.Version, "v")
+}
 
 func main() {
 	cfg, err := config.LoadConfig()
@@ -35,7 +49,8 @@ func main() {
 	if cfg.Mode == "http" {
 		opts = append(opts, server.WithAttachmentURL(cfg.AttachmentURLSecret, cfg.ExternalURL))
 	}
-	srv := server.NewServer(version, cfg.SessionURL, opts...)
+	info, _ := debug.ReadBuildInfo()
+	srv := server.NewServer(reportedVersion(version, info), cfg.SessionURL, opts...)
 
 	switch cfg.Mode {
 	case "stdio":
